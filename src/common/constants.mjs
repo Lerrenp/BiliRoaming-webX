@@ -1,3 +1,39 @@
-export const BRX = Object.freeze({ MAIN_SOURCE:'BRX_PLAYER_MAIN', CONTENT_SOURCE:'BRX_PLAYER_CONTENT', START:'BRX_PLAYER_START', EPISODE_SELECT:'BRX_PLAYER_EPISODE_SELECT' });
-export const DEFAULT_CONFIG = Object.freeze({ enabled:true, serverBaseUrl:'https://bili.xcnya.cn', area:'hk', clientMode:'web', accessKey:'', defaultQn:'80', defaultCodec:'auto', defaultAudioId:'auto', danmakuEnabled:true, danmakuOpacity:0.95, debug:true });
-export const QUALITY_LABELS = Object.freeze({127:'8K',126:'杜比视界',125:'HDR',120:'4K',116:'1080P60',112:'1080P+',80:'1080P',74:'720P60',64:'720P',32:'480P',16:'360P',15:'360P'});
+export const BRX = Object.freeze({
+  MAIN_SOURCE: 'BRX_PLAYER_MAIN',
+  CONTENT_SOURCE: 'BRX_PLAYER_CONTENT',
+  START: 'BRX_PLAYER_START',
+  EPISODE_SELECT: 'BRX_PLAYER_EPISODE_SELECT',
+});
+
+export const DEFAULT_CONFIG = Object.freeze({
+  enabled: true,
+  serverBaseUrl: 'https://bili.xcnya.cn',
+  area: 'hk',
+  clientMode: 'web',
+  accessKey: '',
+  defaultQn: '80',
+  defaultCodec: 'auto',
+  defaultAudioId: 'auto',
+  danmakuEnabled: true,
+  danmakuOpacity: 0.95,
+  danmakuArea: 0.75,
+  danmakuFontSize: 25,
+  danmakuSpeed: 1,
+  danmakuMaxVisible: 120,
+  debug: true,
+});
+
+export const QUALITY_LABELS = Object.freeze({
+  127: '8K',
+  126: '杜比视界',
+  125: 'HDR',
+  120: '4K',
+  116: '1080P60',
+  112: '1080P+',
+  80: '1080P',
+  74: '720P60',
+  64: '720P',
+  32: '480P',
+  16: '360P',
+  15: '360P',
+});

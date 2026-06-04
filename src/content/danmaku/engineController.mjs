@@ -4,6 +4,15 @@ export async function startDanmaku({ layer, video, context, config, log }) {
     const createEngine = mod.createEngine;
     if (!createEngine) throw new Error('danmaku-lite createEngine not found');
 
+    const state = {
+      enabled: !!config.danmakuEnabled,
+      opacity: clamp(Number(config.danmakuOpacity || 0.95), 0.2, 1),
+      area: clamp(Number(config.danmakuArea || 0.75), 0.25, 1),
+      fontSize: clamp(Number(config.danmakuFontSize || 25), 12, 64),
+      speed: clamp(Number(config.danmakuSpeed || 1), 0.5, 3),
+      maxVisible: Math.max(0, Number(config.danmakuMaxVisible || 120)),
+    };
+
     const engine = createEngine('canvas', {
       container: layer,
       adapter: {
@@ -11,32 +20,70 @@ export async function startDanmaku({ layer, video, context, config, log }) {
         get paused() { return video.paused; },
         get duration() { return video.duration || 0; },
       },
+      enabled: state.enabled,
       fontFamily: 'Noto Sans SC, Microsoft YaHei, sans-serif',
-      fontSize: Number(config.danmakuFontSize || 25),
-      opacity: Number(config.danmakuOpacity || 0.95),
-      area: Number(config.danmakuArea || 0.75),
-      speed: Number(config.danmakuSpeed || 1),
-      maxVisible: Number(config.danmakuMaxVisible || 120),
+      fontSize: state.fontSize,
+      opacity: state.opacity,
+      area: state.area,
+      speed: state.speed,
+      maxVisible: state.maxVisible,
     });
 
     const items = await fetchXmlDanmaku(context.cid, log);
     engine.load(items);
-    const onResize = () => engine.resize();
-    const onLoadedMetadata = () => engine.resize();
-    const onSeeked = () => engine.resize();
+    applyState();
+
+    const onResize = () => resizeSoon(engine);
+    const onLoadedMetadata = () => resizeSoon(engine);
+    const onSeeked = () => resizeSoon(engine);
     window.addEventListener('resize', onResize);
     document.addEventListener('fullscreenchange', onResize);
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('seeked', onSeeked);
     queueMicrotask(onResize);
     setTimeout(onResize, 300);
-    log.info('danmaku loaded', { cid: context.cid, count: items.length });
+    log.info('danmaku loaded', { cid: context.cid, count: items.length, state });
+
+    function applyState() {
+      layer.style.display = state.enabled ? '' : 'none';
+      engine.setEnabled?.(state.enabled);
+      engine.setOpacity?.(state.opacity);
+      engine.setArea?.(state.area);
+      engine.setFontSize?.(state.fontSize);
+      engine.setSpeed?.(state.speed);
+      engine.setMaxVisible?.(state.maxVisible);
+      resizeSoon(engine);
+    }
 
     return {
       engine,
       count: items.length,
-      setEnabled(enabled) { engine.setEnabled?.(!!enabled); },
-      setOpacity(opacity) { engine.setOpacity?.(Number(opacity) || 1); },
+      getState() { return { ...state }; },
+      setEnabled(enabled) {
+        state.enabled = !!enabled;
+        applyState();
+      },
+      setOpacity(opacity) {
+        state.opacity = clamp(Number(opacity) || 1, 0.2, 1);
+        applyState();
+      },
+      setArea(area) {
+        state.area = clamp(Number(area) || 1, 0.25, 1);
+        applyState();
+      },
+      setFontSize(fontSize) {
+        state.fontSize = clamp(Number(fontSize) || 25, 12, 64);
+        applyState();
+      },
+      setSpeed(speed) {
+        state.speed = clamp(Number(speed) || 1, 0.5, 3);
+        applyState();
+      },
+      setMaxVisible(maxVisible) {
+        state.maxVisible = Math.max(0, Number(maxVisible) || 0);
+        applyState();
+      },
+      resize() { resizeSoon(engine); },
       destroy() {
         window.removeEventListener('resize', onResize);
         document.removeEventListener('fullscreenchange', onResize);
@@ -85,8 +132,6 @@ function normalizeBiliXmlDanmaku(d, index) {
 }
 
 function mapBiliModeToDanmakuLite(mode) {
-  // Bili XML: 1/2/3 = scrolling, 4 = bottom, 5 = top, 6 = reverse, 7/8 = special/code.
-  // danmaku-lite canvas package: 1 = Scroll, 5 = Top, 6 = Bottom.
   if (mode === 4) return 6;
   if (mode === 5) return 5;
   if (mode === 7 || mode === 8) return 0;
@@ -101,4 +146,15 @@ function normalizeColor(value) {
 function normalizeFontSize(value) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? Math.min(Math.max(n, 12), 64) : undefined;
+}
+
+function resizeSoon(engine) {
+  try { engine.resize?.(); } catch (_) {}
+  requestAnimationFrame(() => {
+    try { engine.resize?.(); } catch (_) {}
+  });
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }

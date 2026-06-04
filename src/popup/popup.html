@@ -31,7 +31,12 @@
     <section>
       <h2>弹幕</h2>
       <label class="row"><input id="danmakuEnabled" type="checkbox"> 启用弹幕层</label>
+      <label>显示区域 <select id="danmakuArea"><option value="0.25">1/4 屏</option><option value="0.5">1/2 屏</option><option value="0.75">3/4 屏</option><option value="1">全屏</option></select></label>
       <label>透明度 <input id="danmakuOpacity" type="range" min="0.2" max="1" step="0.05"><span id="opacityText"></span></label>
+      <div class="grid2">
+        <label>字号 <input id="danmakuFontSize" type="number" min="12" max="64" step="1"></label>
+        <label>速度 <input id="danmakuSpeed" type="number" min="0.5" max="3" step="0.1"></label>
+      </div>
     </section>
 
     <button id="save" type="button">保存</button>

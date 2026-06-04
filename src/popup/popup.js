@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from '../common/constants.mjs';
-const ids = ['enabled', 'serverBaseUrl', 'clientMode', 'area', 'accessKey', 'defaultQn', 'defaultCodec', 'defaultAudioId', 'danmakuEnabled', 'danmakuOpacity'];
+const ids = ['enabled', 'serverBaseUrl', 'clientMode', 'area', 'accessKey', 'defaultQn', 'defaultCodec', 'defaultAudioId', 'danmakuEnabled', 'danmakuArea', 'danmakuOpacity', 'danmakuFontSize', 'danmakuSpeed'];
 const $ = (id) => document.getElementById(id);
 
 async function load() {
@@ -23,6 +23,9 @@ async function save() {
     patch[id] = el.type === 'checkbox' ? el.checked : el.value;
   }
   patch.danmakuOpacity = Number(patch.danmakuOpacity || DEFAULT_CONFIG.danmakuOpacity);
+  patch.danmakuArea = Number(patch.danmakuArea || DEFAULT_CONFIG.danmakuArea);
+  patch.danmakuFontSize = Number(patch.danmakuFontSize || DEFAULT_CONFIG.danmakuFontSize);
+  patch.danmakuSpeed = Number(patch.danmakuSpeed || DEFAULT_CONFIG.danmakuSpeed);
   await chrome.runtime.sendMessage({ type: 'BRX_PLAYER_ACTION', action: 'SET_CONFIG', payload: patch });
   $('status').textContent = '已保存。新配置会在下次加载/切集时生效';
 }

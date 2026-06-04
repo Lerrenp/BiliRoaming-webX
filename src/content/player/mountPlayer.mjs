@@ -3,6 +3,13 @@ import { extractDash, uniqueQualities, uniqueCodecs, audioOptions, createMpdUrl,
 import { createQualityPanel } from './qualityPanel.mjs';
 import { startDanmaku } from '../danmaku/engineController.mjs';
 
+const DANMAKU_AREA_OPTIONS = [
+  { value: 0.25, html: '1/4 屏' },
+  { value: 0.5, html: '1/2 屏' },
+  { value: 0.75, html: '3/4 屏' },
+  { value: 1, html: '全屏' },
+];
+
 export async function mountPlayer({ playurl, context, config, log }) {
   const dash = extractDash(playurl);
   if (!dash || !dash.video?.length) throw new Error('No DASH video in playurl response');
@@ -19,7 +26,6 @@ export async function mountPlayer({ playurl, context, config, log }) {
   root.className = 'brx-player-root brx-artplayer-root';
   root.innerHTML = `
     <div class="brx-artplayer-box"></div>
-    <div class="brx-danmaku-layer"></div>
     <div class="brx-status">BiliRoaming-X ArtPlayer</div>
   `;
   const style = document.createElement('style');
@@ -32,8 +38,10 @@ export async function mountPlayer({ playurl, context, config, log }) {
   }
 
   const artBox = root.querySelector('.brx-artplayer-box');
-  const layer = root.querySelector('.brx-danmaku-layer');
   const status = root.querySelector('.brx-status');
+  const layer = document.createElement('div');
+  layer.className = 'brx-danmaku-layer';
+
   const qualities = uniqueQualities(dash.video || []);
   const codecs = uniqueCodecs(dash.video || []);
   const audios = audioOptions(dash.audio || dash.dolby?.audio || []);
@@ -44,10 +52,19 @@ export async function mountPlayer({ playurl, context, config, log }) {
   };
   if (!qualities.some((q) => q.id === selection.qn)) selection.qn = qualities[0]?.id || 'auto';
 
+  const danmakuState = {
+    enabled: !!config.danmakuEnabled,
+    area: Number(config.danmakuArea || 0.75),
+    opacity: Number(config.danmakuOpacity || 0.95),
+    fontSize: Number(config.danmakuFontSize || 25),
+    speed: Number(config.danmakuSpeed || 1),
+  };
+
   let mpdObjectUrl = '';
   let art = null;
   let dashPlayer = null;
   let danmaku = null;
+  let resizeObserver = null;
   const panel = createQualityPanel({ qualities, codecs, audios, initial: selection, onChange: reloadWithSelection });
   root.appendChild(panel);
 
@@ -94,7 +111,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
     url: nextMpdUrl(),
     type: 'mpd',
     autoplay: true,
-    pip: true,
+    pip: false,
     autoSize: false,
     autoMini: false,
     screenshot: false,
@@ -111,10 +128,23 @@ export async function mountPlayer({ playurl, context, config, log }) {
   });
 
   art.on('ready', async () => {
+    attachDanmakuLayer();
+    installResizeRelay();
     const video = art.video;
-    danmaku = config.danmakuEnabled ? await startDanmaku({ layer, video, context, config, log }) : null;
-    window.__BRX_PLAYER_DEBUG__ = Object.assign(window.__BRX_PLAYER_DEBUG__ || {}, { art, dashPlayer, danmaku });
+    danmaku = config.danmakuEnabled ? await startDanmaku({ layer, video, context, config: { ...config, ...danmakuState }, log }) : null;
+    updateDanmakuLayerState();
+    window.__BRX_PLAYER_DEBUG__ = Object.assign(window.__BRX_PLAYER_DEBUG__ || {}, { art, dashPlayer, danmaku, danmakuLayer: layer });
   });
+
+  for (const eventName of ['resize', 'fullscreen', 'fullscreenWeb', 'mini', 'pip', 'document-pip']) {
+    art.on(eventName, () => {
+      setTimeout(attachDanmakuLayer, 0);
+      setTimeout(attachDanmakuLayer, 120);
+      resizeDanmakuSoon();
+    });
+  }
+  document.addEventListener('fullscreenchange', onGlobalFullscreenChange);
+  window.addEventListener('resize', resizeDanmakuSoon);
 
   async function reloadWithSelection(next) {
     selection = next;
@@ -128,6 +158,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
     const onMeta = () => {
       try { art.video.currentTime = t; } catch (_) {}
       if (!paused) art.video.play().catch(() => {});
+      resizeDanmakuSoon();
       art.video.removeEventListener('loadedmetadata', onMeta);
     };
     art?.video?.addEventListener('loadedmetadata', onMeta);
@@ -153,24 +184,114 @@ export async function mountPlayer({ playurl, context, config, log }) {
         selector: audios.map((a) => ({ html: a.label, value: a.id, default: a.id === selection.audioId })),
         onSelect: (item) => { reloadWithSelection({ ...selection, audioId: item.value }); return item.html; },
       },
+      ...createDanmakuSettings(),
+    ];
+  }
+
+  function createDanmakuSettings() {
+    return [
       {
         html: '弹幕',
-        switch: !!config.danmakuEnabled,
+        tooltip: danmakuState.enabled ? '开启' : '关闭',
+        switch: danmakuState.enabled,
         onSwitch: (item) => {
-          const enabled = !item.switch;
-          danmaku?.setEnabled?.(enabled);
-          layer.style.display = enabled ? '' : 'none';
-          return enabled;
+          danmakuState.enabled = !item.switch;
+          item.tooltip = danmakuState.enabled ? '开启' : '关闭';
+          updateDanmakuLayerState();
+          return danmakuState.enabled;
+        },
+      },
+      {
+        html: '弹幕区域',
+        tooltip: areaLabel(danmakuState.area),
+        selector: DANMAKU_AREA_OPTIONS.map((opt) => ({ ...opt, default: Number(opt.value) === Number(danmakuState.area) })),
+        onSelect: (item) => {
+          danmakuState.area = Number(item.value);
+          updateDanmakuLayerState();
+          return item.html;
+        },
+      },
+      {
+        html: '弹幕透明度',
+        tooltip: percent(danmakuState.opacity),
+        range: [Math.round(danmakuState.opacity * 100), 20, 100, 5],
+        onChange: (item) => {
+          danmakuState.opacity = Number(item.range[0]) / 100;
+          updateDanmakuLayerState();
+          return percent(danmakuState.opacity);
+        },
+      },
+      {
+        html: '弹幕字号',
+        tooltip: `${danmakuState.fontSize}px`,
+        range: [danmakuState.fontSize, 16, 48, 1],
+        onChange: (item) => {
+          danmakuState.fontSize = Number(item.range[0]);
+          updateDanmakuLayerState();
+          return `${danmakuState.fontSize}px`;
+        },
+      },
+      {
+        html: '弹幕速度',
+        tooltip: `${danmakuState.speed.toFixed(1)}x`,
+        range: [Math.round(danmakuState.speed * 10), 5, 30, 1],
+        onChange: (item) => {
+          danmakuState.speed = Number(item.range[0]) / 10;
+          updateDanmakuLayerState();
+          return `${danmakuState.speed.toFixed(1)}x`;
         },
       },
     ];
   }
 
   function createArtPlugins() {
-    // v1.1.0 dash-control expects dash.js v3 API (getBitrateInfoListFor).
-    // Current bundled dash.js is v5, and the plugin throws on ArtPlayer ready.
-    // Manual BRX quality settings above already provide qn/codec/audio switching.
-    return [];
+    const plugins = [];
+    if (window.artplayerPluginDocumentPip) {
+      plugins.push(window.artplayerPluginDocumentPip({ width: 640, height: 360, fallbackToVideoPiP: false, placeholder: '正在以画中画播放' }));
+    }
+    return plugins;
+  }
+
+  function attachDanmakuLayer() {
+    const doc = art?.video?.ownerDocument || document;
+    const player = doc.querySelector('.artplayer') || art?.template?.$player || art?.template?.$container || artBox.querySelector('.artplayer') || artBox;
+    if (!player || layer.parentElement === player) return;
+    player.appendChild(layer);
+    resizeDanmakuSoon();
+  }
+
+  function installResizeRelay() {
+    if (resizeObserver || !window.ResizeObserver) return;
+    resizeObserver = new ResizeObserver(resizeDanmakuSoon);
+    resizeObserver.observe(layer);
+    if (art?.template?.$player) resizeObserver.observe(art.template.$player);
+    if (art?.template?.$container) resizeObserver.observe(art.template.$container);
+    if (art?.video) resizeObserver.observe(art.video);
+  }
+
+  function updateDanmakuLayerState() {
+    layer.style.display = danmakuState.enabled ? '' : 'none';
+    danmaku?.setEnabled?.(danmakuState.enabled);
+    danmaku?.setArea?.(danmakuState.area);
+    danmaku?.setOpacity?.(danmakuState.opacity);
+    danmaku?.setFontSize?.(danmakuState.fontSize);
+    danmaku?.setSpeed?.(danmakuState.speed);
+    resizeDanmakuSoon();
+  }
+
+  function resizeDanmakuSoon() {
+    try { danmaku?.resize?.(); } catch (_) {}
+    requestAnimationFrame(() => {
+      try { danmaku?.resize?.(); } catch (_) {}
+    });
+    setTimeout(() => {
+      try { danmaku?.resize?.(); } catch (_) {}
+    }, 120);
+  }
+
+  function onGlobalFullscreenChange() {
+    attachDanmakuLayer();
+    resizeDanmakuSoon();
   }
 
   function labelSelection(sel) {
@@ -189,6 +310,9 @@ export async function mountPlayer({ playurl, context, config, log }) {
     get selection() { return selection; },
     get danmaku() { return danmaku; },
     destroy() {
+      document.removeEventListener('fullscreenchange', onGlobalFullscreenChange);
+      window.removeEventListener('resize', resizeDanmakuSoon);
+      try { resizeObserver?.disconnect?.(); } catch (_) {}
       try { danmaku?.destroy?.(); } catch (_) {}
       try { dashPlayer?.reset?.(); } catch (_) {}
       try { art?.destroy?.(false); } catch (_) {}
@@ -203,6 +327,14 @@ async function ensureVendorLoaded() {
   if (!window.dashjs) throw new Error('dash.js content script not loaded');
 }
 
+function areaLabel(area) {
+  return DANMAKU_AREA_OPTIONS.find((opt) => Number(opt.value) === Number(area))?.html || '3/4 屏';
+}
+
+function percent(value) {
+  return Math.round(Number(value) * 100) + '%';
+}
+
 function cssText() {
-  return `.brx-player-root{position:absolute;inset:0;z-index:999;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.brx-artplayer-box{position:absolute;inset:0;background:#000}.brx-artplayer-box .artplayer{width:100%!important;height:100%!important}.brx-danmaku-layer{position:absolute;inset:0;pointer-events:none;z-index:31;overflow:hidden;width:100%;height:100%;contain:layout paint}.brx-status{position:absolute;left:14px;top:12px;z-index:35;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;transition:opacity .35s}.brx-quality-panel{position:absolute;right:12px;top:12px;z-index:36;display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.62);padding:8px;border-radius:8px;backdrop-filter:blur(4px);opacity:.25;transition:opacity .2s}.brx-quality-panel:hover{opacity:1}.brx-quality-panel label{font-size:12px;color:#fff;display:flex;gap:4px;align-items:center}.brx-quality-panel select{background:#18191c;color:#fff;border:1px solid #555;border-radius:4px;padding:3px 5px}`;
+  return `.brx-player-root{position:absolute;inset:0;z-index:999;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.brx-artplayer-box{position:absolute;inset:0;background:#000}.brx-artplayer-box .artplayer{width:100%!important;height:100%!important}.brx-danmaku-layer{position:absolute;inset:0;pointer-events:none;z-index:31;overflow:hidden;width:100%;height:100%;contain:layout paint}.brx-danmaku-layer canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}.artplayer-fullscreen .brx-danmaku-layer,.artplayer-fullscreen-web .brx-danmaku-layer,.artplayer-document-pip .brx-danmaku-layer{z-index:31}.brx-status{position:absolute;left:14px;top:12px;z-index:35;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;transition:opacity .35s}.brx-quality-panel{position:absolute;right:12px;top:12px;z-index:36;display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.62);padding:8px;border-radius:8px;backdrop-filter:blur(4px);opacity:.25;transition:opacity .2s}.brx-quality-panel:hover{opacity:1}.brx-quality-panel label{font-size:12px;color:#fff;display:flex;gap:4px;align-items:center}.brx-quality-panel select{background:#18191c;color:#fff;border:1px solid #555;border-radius:4px;padding:3px 5px}`;
 }
