@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BiliRoaming-X Player",
-  "version": "0.1.0",
-  "description": "使用 VisionPlayer / danmaku-lite / dash.js 覆盖式播放 B 站区域限制番剧",
+  "version": "0.3.0",
+  "description": "B 站区域限制番剧覆盖式播放器（v0.3 ArtPlayer 迁移中）",
   "minimum_chrome_version": "120",
   "permissions": [
     "storage",
@@ -66,7 +66,6 @@
         "src/common/constants.mjs",
         "src/common/logger.mjs",
         "src/common/dom.mjs",
-        "vendor/visionplayer.streaming.mjs",
         "vendor/danmaku-lite.canvas.mjs",
         "vendor/dash.all.min.js",
         "vendor/dash.all.min.mjs"
