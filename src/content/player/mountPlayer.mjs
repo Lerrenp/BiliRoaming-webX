@@ -157,7 +157,10 @@ export async function mountPlayer({ playurl, context, config, log }) {
   function createArtPlugins() {
     const plugins = [];
     if (window.artplayerPluginDanmuku) {
-      const cid = context?.cid;
+      const cid = Number(context?.cid) || 0;
+      if (!cid) {
+        log.warn('danmuku: skip load, context.cid missing', { context });
+      }
       const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
       plugins.push(window.artplayerPluginDanmuku({
         danmuku: danmukuUrl,

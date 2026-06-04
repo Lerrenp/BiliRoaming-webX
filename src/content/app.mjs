@@ -38,7 +38,14 @@ async function handleStart(payload, reason) {
   let context = { ...(payload.context || {}) };
   if (context.epId) {
     try {
-      context = Object.assign(context, await sendRuntime('FETCH_EP_INFO', { epId: context.epId }));
+      const patch = await sendRuntime('FETCH_EP_INFO', { epId: context.epId });
+      // 非破坏性合并：只填补缺失字段，绝不用 null/'' 覆盖已有值。
+      // 修复历史：曾因 FETCH_EP_INFO 用错端点返回 {cid:null}，把 MAIN 已经传过来的有效 cid 覆盖。
+      for (const k of ['epId', 'aid', 'cid', 'bvid', 'duration']) {
+        const v = patch?.[k];
+        if (v !== undefined && v !== null && v !== '') context[k] = v;
+        else if (context[k] === undefined || context[k] === null || context[k] === '') context[k] = v;
+      }
     } catch (err) {
       log.warn('fetch episode info failed', context.epId, err);
     }
