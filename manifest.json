@@ -42,6 +42,8 @@
       ],
       "js": [
         "vendor/dash.all.min.js",
+        "vendor/artplayer.js",
+        "vendor/artplayer-plugin-dash-control.js",
         "src/content/content.js"
       ],
       "world": "ISOLATED",
@@ -68,7 +70,9 @@
         "src/common/dom.mjs",
         "vendor/danmaku-lite.canvas.mjs",
         "vendor/dash.all.min.js",
-        "vendor/dash.all.min.mjs"
+        "vendor/dash.all.min.mjs",
+        "vendor/artplayer.js",
+        "vendor/artplayer-plugin-dash-control.js"
       ],
       "matches": [
         "*://*.bilibili.com/*"

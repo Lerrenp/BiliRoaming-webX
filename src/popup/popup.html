@@ -1,1 +1,43 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><link rel="stylesheet" href="popup.css"><title>BRX Player</title></head><body><main><h1>BiliRoaming-X Player</h1><label><input id="enabled" type="checkbox"> 启用</label><label>服务端 <input id="serverBaseUrl"></label><label>区域 <select id="area"><option value="hk">HK</option><option value="tw">TW</option><option value="cn">CN</option><option value="th">TH</option></select></label><label>Access Key <textarea id="accessKey" rows="3" placeholder="App access_key"></textarea></label><button id="readKey">从当前 B 站页面读取 access_key</button><label>默认清晰度 <select id="defaultQn"><option value="112">1080P+</option><option value="80">1080P</option><option value="64">720P</option><option value="32">480P</option><option value="16">360P</option></select></label><label>默认编码 <select id="defaultCodec"><option value="auto">自动</option><option value="avc">AVC</option><option value="hevc">HEVC</option><option value="av1">AV1</option></select></label><label><input id="danmakuEnabled" type="checkbox"> 弹幕</label><button id="save">保存</button><p id="status"></p></main><script type="module" src="popup.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+  <title>BRX Player</title>
+</head>
+<body>
+  <main>
+    <h1>BiliRoaming-X Player</h1>
+    <section>
+      <label class="row"><input id="enabled" type="checkbox"> 启用扩展播放器</label>
+      <label>服务端 <input id="serverBaseUrl" placeholder="https://example.com"></label>
+      <div class="grid2">
+        <label>模式 <select id="clientMode"><option value="web">Web</option><option value="app">App</option></select></label>
+        <label>区域 <select id="area"><option value="hk">HK 港澳台</option><option value="tw">TW 台湾</option><option value="th">TH 泰国</option><option value="cn">CN 大陆</option></select></label>
+      </div>
+      <label>Access Key <textarea id="accessKey" rows="3" placeholder="App 模式可填写 access_key"></textarea></label>
+      <button id="readKey" type="button">从当前 B 站页面读取 access_key</button>
+    </section>
+
+    <section>
+      <h2>ArtPlayer</h2>
+      <div class="grid2">
+        <label>默认清晰度 <select id="defaultQn"><option value="auto">自动</option><option value="120">4K</option><option value="116">1080P60</option><option value="112">1080P+</option><option value="80">1080P</option><option value="74">720P60</option><option value="64">720P</option><option value="32">480P</option><option value="16">360P</option></select></label>
+        <label>默认编码 <select id="defaultCodec"><option value="auto">自动</option><option value="avc">AVC</option><option value="hevc">HEVC</option><option value="av1">AV1</option></select></label>
+      </div>
+      <label>默认音轨 <select id="defaultAudioId"><option value="auto">自动</option></select></label>
+    </section>
+
+    <section>
+      <h2>弹幕</h2>
+      <label class="row"><input id="danmakuEnabled" type="checkbox"> 启用弹幕层</label>
+      <label>透明度 <input id="danmakuOpacity" type="range" min="0.2" max="1" step="0.05"><span id="opacityText"></span></label>
+    </section>
+
+    <button id="save" type="button">保存</button>
+    <button id="reload" class="secondary" type="button">刷新当前页面</button>
+    <p id="status"></p>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
