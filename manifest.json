@@ -65,17 +65,14 @@
         "src/content/player/dashMpdBuilder.mjs",
         "src/content/player/qualityPanel.mjs",
         "src/content/player/mountPlayer.mjs",
-        "src/content/danmaku/engineController.mjs",
         "src/common/constants.mjs",
         "src/common/logger.mjs",
         "src/common/dom.mjs",
-        "vendor/danmaku-lite.canvas.mjs",
         "vendor/dash.all.min.js",
         "vendor/dash.all.min.mjs",
         "vendor/artplayer.js",
         "vendor/artplayer-plugin-dash-control.js",
-        "vendor/artplayer-plugin-document-pip.js",
-        "src/content/danmaku/danmakuControl.mjs"
+        "vendor/artplayer-plugin-document-pip.js"
       ],
       "matches": [
         "*://*.bilibili.com/*"
