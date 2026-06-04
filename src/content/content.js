@@ -1,0 +1,1 @@
+(async () => { if(window.__BRX_PLAYER_CONTENT_BOOTSTRAPPED__) return; window.__BRX_PLAYER_CONTENT_BOOTSTRAPPED__=true; const mod=await import(chrome.runtime.getURL('src/content/app.mjs')); await mod.startContentApp(); })();

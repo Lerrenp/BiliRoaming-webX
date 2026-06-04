@@ -1,0 +1,3 @@
+import { BRX } from '../common/constants.mjs';
+export class PageBridge{ constructor(logger){this.logger=logger;this.handlers=new Map();this.bound=this.onMessage.bind(this)} start(){window.addEventListener('message',this.bound)} stop(){window.removeEventListener('message',this.bound)} on(type,fn){this.handlers.set(type,fn)} async onMessage(event){ if(event.source!==window) return; const msg=event.data; if(!msg||msg.source!==BRX.MAIN_SOURCE) return; const fn=this.handlers.get(msg.type); if(!fn) return; try{await fn(msg.payload||{})}catch(err){this.logger.error('bridge handler failed',msg.type,err)} } }
+export function sendRuntime(action,payload){ return chrome.runtime.sendMessage({type:'BRX_PLAYER_ACTION',action,payload}); }

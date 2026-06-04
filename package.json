@@ -1,0 +1,2 @@
+{"name":"biliroaming-x-player","version":"0.1.0","type":"module","private":true,"scripts":{"check":"node --experimental-vm-modules scripts/check-syntax.mjs"}}
+

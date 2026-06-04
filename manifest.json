@@ -1,0 +1,79 @@
+{
+  "manifest_version": 3,
+  "name": "BiliRoaming-X Player",
+  "version": "0.1.0",
+  "description": "使用 VisionPlayer / danmaku-lite / dash.js 覆盖式播放 B 站区域限制番剧",
+  "minimum_chrome_version": "120",
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.bilibili.com/*",
+    "*://*.bilivideo.com/*",
+    "*://*.bilivideo.cn/*",
+    "*://*.hdslb.com/*",
+    "*://comment.bilibili.com/*",
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.bilibili.com/bangumi/play/*",
+        "*://www.bilibili.com/bangumi/media/md*"
+      ],
+      "js": [
+        "src/inject/main.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://www.bilibili.com/bangumi/play/*",
+        "*://www.bilibili.com/bangumi/media/md*"
+      ],
+      "js": [
+        "vendor/dash.all.min.js",
+        "src/content/content.js"
+      ],
+      "world": "ISOLATED",
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_title": "BiliRoaming-X Player",
+    "default_popup": "src/popup/popup.html"
+  },
+  "options_page": "src/options/options.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/app.mjs",
+        "src/content/bridge.mjs",
+        "src/content/player/dashMpdBuilder.mjs",
+        "src/content/player/qualityPanel.mjs",
+        "src/content/player/visionController.mjs",
+        "src/content/danmaku/engineController.mjs",
+        "src/common/constants.mjs",
+        "src/common/logger.mjs",
+        "src/common/dom.mjs",
+        "vendor/visionplayer.streaming.mjs",
+        "vendor/danmaku-lite.canvas.mjs",
+        "vendor/dash.all.min.js",
+        "vendor/dash.all.min.mjs"
+      ],
+      "matches": [
+        "*://*.bilibili.com/*"
+      ]
+    }
+  ]
+}

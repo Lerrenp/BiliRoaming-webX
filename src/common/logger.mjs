@@ -1,0 +1,1 @@
+export function createLogger(tag='[BRX-Player]'){ const out=(level,args)=>{try{console[level](tag,...args)}catch(_){}}; return {debug:(...a)=>out('debug',a),info:(...a)=>out('info',a),warn:(...a)=>out('warn',a),error:(...a)=>out('error',a)}; }
