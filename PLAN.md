@@ -1,7 +1,31 @@
 # BiliRoaming-X Player 计划文档
 
 > 创建日期：2026-06-04  
-> 目标：在受限番剧播放时，浏览器扩展调用 BiliRoaming 解析服务，**用 VisionPlayer 覆盖 B 站原生播放器**，并正确加载弹幕和评论。
+> 最后修订：2026-06-04（v0.3 草案）  
+> 目标：在受限番剧播放时，浏览器扩展调用 BiliRoaming 解析服务，**用 ArtPlayer 体系覆盖 B 站原生播放器**，并正确加载弹幕和评论。
+
+---
+
+## 0. 修订记录
+
+### v0.3（2026-06-04 草案，**待评审**）
+
+**关键变更**：
+- 播放器内核：**VisionPlayer → ArtPlayer 5.4.1**
+- 弹幕内核：**danmaku-lite → artplayer-plugin-danmuku**
+- 清晰度/音轨 UI：**自写 qualityPanel → artplayer-plugin-dash-control**
+- 业务封装层：新增 **`biliDashProvider/`** 子模块，对外只暴露 `mount(ctx)` API
+
+**关键认知修正**（重要，影响后续工作量）：
+
+| 原认知 | 修正后 | 影响 |
+|---|---|---|
+| 切换 ArtPlayer 后可"消灭 MPD Builder" | **B 站 v2 JSON 是非标 DASH，MPD Builder 是领域适配器，必须保留** | 不再投入精力研究"消灭"方案 |
+| 切换后 dash.js 可去掉 | **`artplayer-plugin-dash-control` 不含 MSE 引擎，dash.js 必须保留** | manifest web_accessible_resources 保留 `dash.all.min.js` |
+| `artplayer-plugin-danmuku/bilibili.js` 能直接吃 B 站弹幕 | **插件吃 XML，B 站是 Protobuf，仍需转接层** | 需要 `protobufToXml.mjs` |
+| "2.x→5.x 转换层"是 API 包装 | **是 B 站 v2 端点 → 标准 MPD XML 的协议格式转换** | 命名修正为"MPD Builder" |
+
+**新工作分解**（4-5 天，比原 8-10 天减半）详见 §十一。
 
 ---
 
@@ -390,37 +414,40 @@ async function launchVisionPlayer(playurlResp: PlayurlResult) {
 
 **每个 Representation 内的 BaseURL 必须包含 buvid3 参数**（与 background 协作或本地注入）。
 
-### 4.4 弹幕数据源适配器（bilibiliAdapter.ts）
+### 4.4 弹幕数据源适配器（bilibiliAdapter.mjs）
 
-**实现 DataSourceAdapter 接口**：
+**目标**：把 B 站 Protobuf 弹幕转成 `artplayer-plugin-danmuku` 期望的 XML 格式。
 
-```ts
-export class BilibiliAdapter implements DataSourceAdapter {
-  // 元数据
-  async getMeta(cid: number, aid: number, duration: number): Promise<DanmakuMeta> {
-    const url = `https://api.bilibili.com/x/v2/dm/web/view?type=1&oid=${cid}&pid=${aid}&duration=${duration}&without_subtitle=true`;
-    const resp = await fetch(url);
-    const buf = await resp.arrayBuffer();
-    return parseDanmakuViewProtobuf(buf);
-  }
-
-  // 拉某段弹幕 (6 分钟一段)
-  async fetchSegment(segmentIndex: number, meta: DanmakuMeta): Promise<DanmakuItem[]> {
-    const params = new URLSearchParams({
-      type: '1', oid: String(meta.cid), pid: String(meta.aid),
-      segment_index: String(segmentIndex),
-      web_location: '1315873',
-    });
-    const w_rid = wbiSign(params);
-    params.set('w_rid', w_rid);
-    params.set('wts', String(Math.floor(Date.now() / 1000)));
-    const url = `https://api.bilibili.com/x/v2/dm/wbi/web/seg.so?${params}`;
-    const resp = await fetch(url);
-    const buf = await resp.arrayBuffer();
-    return parseDanmakuSegProtobuf(buf);
-  }
+```js
+// biliDashProvider/protobufToXml.mjs
+export async function fetchBilibiliDanmakuXml({ cid, aid, duration }, { wbiSign, log }) {
+  // 1. 拉 dm.web/view（Protobuf）→ 拿元数据
+  const meta = await fetchViewMeta({ cid, aid, duration, wbiSign });
+  // 2. 拉 dm.wbi/web/seg.so?segment_index=N（Protobuf）× N 段
+  const segments = await Promise.all(
+    range(meta.segments).map(i => fetchSegment(i, { cid, aid, wbiSign }))
+  );
+  // 3. 解析 Protobuf → 弹幕对象数组
+  const items = segments.flatMap(parseSegProtobuf);
+  // 4. 转成 XML（B 站 comment.bilibili.com 风格，供 danmuku 插件解析）
+  return buildBilibiliXml(items);
 }
 ```
+
+**XML 输出格式**（与 `comment.bilibili.com/<cid>.xml` 一致）：
+
+```xml
+<i>
+  <d p="time,mode,fontsize,color,timestamp,pool,user,rowId">弹幕文本</d>
+  <d p="...">...</d>
+</i>
+```
+
+**关键说明**：
+- `artplayer-plugin-danmuku/bilibili.js` 已经实现了这个 XML 格式的解析（含 Web Worker 异步）
+- 我们只需要**生产**这个 XML，不需要自己解析
+- 节省：原计划 `parseDanmakuViewProtobuf` + `parseDanmakuSegProtobuf` 的复杂实现 → 简化为"生产 XML"
+- **Protobuf 解码仍需保留**（手写 varint/length-delimited，约 100 行）
 
 ### 4.5 WBI 签名（wbiSigner.ts）
 
@@ -457,6 +484,118 @@ async function getWbiSign(params: URLSearchParams): Promise<string> {
 | protobufjs（动态加载）| 自动生成，但 100KB+ 依赖 |
 
 **决策**：手写核心 Protobuf 解析（只支持 varint/length-delimited/32-bit/64-bit 几种），减体积。
+
+**v0.3 调整**：解码完成后**输出转为 XML**（见 §4.4），不直接构造 JS 对象数组给业务层。这样业务层完全无感 Protobuf 存在。
+
+### 4.6.1 MPD Builder 的定位（**v0.3 关键澄清**）
+
+**MPD Builder 不是"要消灭的转换层"，而是"领域适配器"**：
+
+| 输入 | 输出 | 性质 |
+|---|---|---|
+| B 站 playurl v2 JSON（含 `dash.video[]/audio[]`）| 标准 MPD XML（Period/AdaptationSet/Representation/SegmentBase）| **领域适配器** |
+
+为什么不能消灭：
+- B 站 v2 JSON 字段命名 `base_url`（下划线）vs MPD `BaseURL`（驼峰）
+- B 站无 `Period` 概念
+- B 站无 `AdaptationSet` 概念（需按 `id`（质量码）+ `codecs` 自动分组）
+- B 站 DASH 是单文件 m4s，MPD 强制要求 `SegmentBase` + `Initialization` 结构
+- **任何播放 DASH 的方案都需要这一步**（不只是我们）
+
+**结论**：`mpdBuilder.mjs` 永久保留在 `biliDashProvider/` 下。
+
+### 4.6.2 dash.js 的定位（**v0.3 关键澄清**）
+
+**artplayer-plugin-dash-control 不含 MSE 引擎**，源码中所有调用都是 dash.js API：
+
+```js
+// artplayer-plugin-dash-control/src/index.js
+const qualities = dash.getBitrateInfoListFor('video')  // ← dash.js
+const audioTracks = dash.getTracksFor('audio')         // ← dash.js
+dash.setQualityFor('video', item.value)                // ← dash.js
+```
+
+**ArtPlayer 自身不支持 DASH**（只内置 HLS），因此：
+
+| 组件 | 角色 |
+|---|---|
+| ArtPlayer | video 元素 + UI 状态机 |
+| artplayer-plugin-dash-control | 清晰度/音轨**菜单 UI**（调 dash.js API）|
+| **dash.js** | **MPD 解析 + MSE 引擎**（不可替代）|
+
+**结论**：`dash.all.min.js` 永久保留在 `vendor/`。
+
+---
+
+## 4.7 biliDashProvider 子模块设计（v0.3 新增）
+
+### 定位
+把"B 站特殊协议"封装在一个业务插件内，**对外只暴露 `mountBiliDashPlayer(ctx)` API**。
+
+### 接口契约
+```ts
+interface MountOptions {
+  container: HTMLElement;           // 覆盖层 div
+  playurlResponse: PlayurlResponse; // B 站 v2 JSON（含 result.dash）
+  context: {
+    cid: number;
+    aid: number;
+    duration: number;               // ms
+    title?: string;
+  };
+  config: {
+    defaultQn?: number;             // 默认清晰度
+    defaultCodec?: 'avc'|'hevc'|'av1'|'auto';
+    defaultAudioId?: string|number;
+    danmakuEnabled?: boolean;
+    danmakuOpacity?: number;
+  };
+  log: Logger;
+}
+
+interface Player {
+  destroy(): void;
+  reload(opts?: { qn?, codec?, audioId? }): Promise<void>;
+  setDanmakuEnabled(enabled: boolean): void;
+  // ... 其他 ArtPlayer 代理 API
+}
+
+function mountBiliDashPlayer(opts: MountOptions): Promise<Player>;
+```
+
+### 内部流程
+```
+mountBiliDashPlayer(opts)
+  ↓
+加载 vendor/artplayer/* bundle
+  ↓
+mpdBuilder.buildMpdXml(opts.playurlResponse.result.dash, opts.config)
+  ↓
+URL.createObjectURL(blob) → mpdUrl
+  ↓
+加载 vendor/dash.all.min.js → window.dashjs
+  ↓
+const dash = dashjs.MediaPlayer().create()
+dash.initialize(video, mpdUrl)
+  ↓
+new ArtPlayer({ container, video, ... })
+  ↓
+art.dash = dash
+art.plugins.add(artplayerPluginDashControl())
+art.plugins.add(artplayerPluginDanmuku({ danmuku: protobufToXml }))
+```
+
+### 文件组织
+```
+src/content/player/biliDashProvider/
+├── index.mjs           # mountBiliDashPlayer 主入口
+├── mpdBuilder.mjs      # 搬自 dashMpdBuilder.mjs
+├── buvidInjector.mjs   # 搬自 patchM4sUrl
+├── wbiSigner.mjs       # WBI 签名
+├── protobufToXml.mjs   # B 站 Protobuf 弹幕 → XML
+├── protobufDecoder.mjs # 手写 Protobuf varint/length-delimited 解析
+└── style.mjs           # 注入样式（隔离）
+```
 
 ### 4.7 background service-worker.ts
 
@@ -712,56 +851,98 @@ window.__BRX_DEBUG__ = {
 
 ---
 
-## 十一、立即行动清单
+## 十一、立即行动清单（v0.3 修订）
 
-按以下顺序执行，每个 P0 项需完成并自测通过才能进入下一项。
+> 修订日期：2026-06-04  
+> 修订原因：技术选型从 VisionPlayer 切换为 ArtPlayer；封装层从"散落模块"整合为 `biliDashProvider/`  
+> 总工时估算：4-5 人天（原 8-10 人天）
 
-### P0-1 项目初始化
-- [ ] package.json 写入依赖
-- [ ] tsconfig.json 配置 ESM + DOM 类型
-- [ ] vite.config.ts 配置 vendor 打包
-- [ ] manifest.json 完整配置（MV3，host_permissions，web_accessible_resources）
-- [ ] .gitignore 排除 vendor/ 临时构建产物但保留 vendor/ 实际 vendor 文件
+### P0-1 vendor 准备（0.5d）
+- [ ] 从 ArtPlayer-master 构建 `artplayer.mjs` 单文件 bundle
+- [ ] 从 ArtPlayer-master 构建 `plugin-dash-control.mjs` 单文件 bundle
+- [ ] 从 ArtPlayer-master 构建 `plugin-danmuku.mjs` 单文件 bundle
+- [ ] **保留** `vendor/dash.all.min.mjs`（MSE 引擎，不可消灭）
+- [ ] 在 `manifest.json` 的 `web_accessible_resources` 列出新 vendor 路径
+- [ ] **移除** `vendor/visionplayer.mjs` 和 `vendor/visionplayer.streaming.mjs`（在切换完成后）
 
-### P0-2 vendor 准备
-- [ ] 从 VisionPlayer-master 构建单文件 bundle
-- [ ] 从 danmaku-lite-main 构建单文件 ESM bundle
-- [ ] 复制到 vendor/ 目录
-- [ ] 在 manifest.json 的 web_accessible_resources 列出 vendor 路径
+### P0-2 biliDashProvider 骨架（0.5d）
+- [ ] 新建 `src/content/player/biliDashProvider/` 目录
+- [ ] 搬 `dashMpdBuilder.mjs` 逻辑 → `biliDashProvider/mpdBuilder.mjs`
+- [ ] 搬 `patchM4sUrl` → `biliDashProvider/buvidInjector.mjs`
+- [ ] 写 `biliDashProvider/index.mjs` 的 `mountBiliDashPlayer` 主框架
 
-### P0-3 通信骨架
-- [ ] src/inject/main.ts 实现区域限制检测 + postMessage
-- [ ] src/content/content.ts 实现 chrome.runtime.sendMessage bridge
-- [ ] src/background/service-worker.ts 实现 FETCH_PLAYURL
+### P0-3 弹幕 Protobuf → XML（1d）
+- [ ] `biliDashProvider/protobufDecoder.mjs` 手写 varint / length-delimited
+- [ ] `biliDashProvider/protobufToXml.mjs` 拉 dm.web/view + seg.so，输出 B 站 XML 格式
+- [ ] `biliDashProvider/wbiSigner.mjs` WBI 签名（mixin_key 启动时拉 nav）
 
-### P0-4 播放流程
-- [ ] src/content/player/dashMpdBuilder.ts 实现 B 站 DASH → 标准 MPD
-- [ ] src/content/player/visionController.ts 加载并初始化 VisionPlayer
-- [ ] src/common/url/buvidInjector.ts m4s URL 注入 buvid3
-- [ ] 原播放器隐藏 + 区域限制 UI 移除
+### P1-1 ArtPlayer 集成（1d）
+- [ ] `biliDashProvider/index.mjs` 完整实现：
+  - 加载 ArtPlayer + dash.js + 2 个 plugin
+  - 初始化 dash.js MediaPlayer → ArtPlayer video
+  - 挂载 dash-control 菜单
+  - 挂载 danmuku 插件，传入 protobufToXml 数据源
 
-### P0-5 弹幕集成
-- [ ] src/content/danmaku/wbiSigner.ts WBI 签名
-- [ ] src/content/danmaku/protobufDecoder.ts Protobuf 解码
-- [ ] src/content/danmaku/bilibiliAdapter.ts B 站数据源适配器
-- [ ] src/content/danmaku/engineController.ts 启动 danmaku-lite
+### P1-2 旧代码清理（0.2d）
+- [ ] 删除 `src/content/player/visionController.mjs`
+- [ ] 删除 `src/content/player/qualityPanel.mjs`
+- [ ] 删除 `src/content/player/dashMpdBuilder.mjs`（已搬入 biliDashProvider）
+- [ ] 删除 `src/content/danmaku/engineController.mjs`（替换为插件调用）
+- [ ] 移除 `manifest.json` web_accessible_resources 中 visionplayer 路径
 
-### P0-6 UI 与配置
-- [ ] src/popup/popup.html/css/ts 基础配置 UI
-- [ ] src/background/config/userConfig.ts 配置持久化
-- [ ] src/options/options.html/css/ts 高级配置
-
-### P0-7 测试与文档
-- [ ] tests/ 单元测试（buvid 注入、MPD 构造、WBI 签名）
-- [ ] docs/ARCHITECTURE.md
-- [ ] docs/COMPATIBILITY.md
-- [ ] docs/ROADMAP.md
-- [ ] README.md 完整更新
-
-### P0-8 持久化测试
-- [ ] 使用 playwright-cli open https://... --headed --persistent 验证 ep713699 可播
+### P2-1 验证（1.5d）
+- [ ] playwright-cli 验证 ep713699 可播
 - [ ] 验证 ss25813 正常页不被干扰
-- [ ] 验证弹幕显示
+- [ ] 验证弹幕显示（XML 格式正确性）
+- [ ] 验证清晰度切换（含编码筛选）
+- [ ] 验证音轨切换
+- [ ] 验证切集时**无旧音频残留**（ArtPlayer 内置 destroy）
+- [ ] 验证弹幕**缓冲时自动暂停**（plugin 内置）
+
+### P3-1 文档（0.5d）
+- [ ] 更新 README.md 技术栈描述
+- [ ] 更新 docs/ARCHITECTURE.md（biliDashProvider 子模块）
+- [ ] 更新 MEMORY.md（追加切换记录）
+- [ ] tests/ 单元测试：
+  - `buvidInjector.test.mjs`
+  - `mpdBuilder.test.mjs`
+  - `wbiSigner.test.mjs`
+  - `protobufToXml.test.mjs`
+
+### 验收标准
+- [ ] 访问 https://www.bilibili.com/bangumi/play/ep713699 自动播放
+- [ ] 弹幕正常显示
+- [ ] 评论区保留
+- [ ] 集数切换可用，**无旧音频残留**
+- [ ] 弹幕**缓冲时自动暂停前进**
+- [ ] 清晰度/编码/音轨切换可用
+
+---
+
+## 十二、风险与对策（v0.3 修订）
+
+### 12.1 风险表
+
+| 风险 | 严重度 | v0.2 对策 | v0.3 对策（调整）|
+|---|---|---|---|
+| B 站 m4s URL deadline 过短 | 中 | 缓存 playurl + 失效前重新拉 | 同上 |
+| WBI mixin_key 轮换 | 高 | 启动时拉 nav 接口拿 key | 同上 |
+| Protobuf 解析错误 | 中 | 严格错误处理 + 单弹幕降级 | 同上，输出降级为纯文本 XML |
+| **VisionPlayer 暂停音频继续** | 高 | 手动 pause/remove/load 兜底 | **ArtPlayer 内置 destroy，根因上解决** |
+| **danmaku-lite 与 video 耦合弱** | 高 | 暂不修复 | **artplayer-plugin-danmuku 内置 currentTime 同步** |
+| 用户点集数时 URL 变化拦截失败 | 中 | history.pushState hook | 同上 |
+| B 站页面结构变化 | 高 | DOM 兼容层 + snapshot 测试 | 同上 |
+| B 站 Player 提前 unmount | 中 | MutationObserver | 同上 |
+| **artplayer-plugin-dash-control 与 dash.js 版本不匹配** | 中 | （新风险）| 锁版本：dash.js 5.x + plugin 1.1.0 |
+| **MV3 content script 加载 ArtPlayer bundle 受限** | 中 | （新风险）| 验证 web_accessible_resources 路径配置 |
+
+### 12.2 已知限制
+
+- **不实现** 4K / HDR / 杜比视界
+- **不实现** 多 P 视频选段
+- **不实现** 实时弹幕发送（仅消费）
+- **不实现** 视频下载
+- **不接管** 稍后再看、历史记录
 
 ---
 
