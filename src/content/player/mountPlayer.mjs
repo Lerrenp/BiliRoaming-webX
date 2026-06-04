@@ -126,8 +126,9 @@ export async function mountPlayer({ playurl, context, config, log }) {
     attachDanmakuLayer();
     installResizeRelay();
     const video = art.video;
-    danmaku = await startDanmaku({ layer, video, context, config: { ...config, ...danmakuState }, log });
     mountDanmakuControl();
+    updateDanmakuLayerState();
+    danmaku = await startDanmaku({ layer, video, context, config: { ...config, ...danmakuState }, log });
     updateDanmakuLayerState();
     window.__BRX_PLAYER_DEBUG__ = Object.assign(window.__BRX_PLAYER_DEBUG__ || {}, { art, dashPlayer, danmaku, danmakuControl, danmakuLayer: layer });
   });
@@ -189,8 +190,13 @@ export async function mountPlayer({ playurl, context, config, log }) {
       state: danmakuState,
       onChange: () => updateDanmakuLayerState(),
     });
-    const mount = art?.template?.$controlsCenter || art?.template?.$controls || art?.template?.$player || artBox;
-    mount.appendChild(danmakuControl.root);
+    art.controls.add({
+      name: 'brx-danmaku',
+      index: 20,
+      position: 'right',
+      html: danmakuControl.root,
+      tooltip: '弹幕',
+    });
   }
 
   function createArtPlugins() {
@@ -263,6 +269,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
       document.removeEventListener('fullscreenchange', onGlobalFullscreenChange);
       window.removeEventListener('resize', resizeDanmakuSoon);
       try { resizeObserver?.disconnect?.(); } catch (_) {}
+      try { art?.controls?.remove?.('brx-danmaku'); } catch (_) {}
       try { danmaku?.destroy?.(); } catch (_) {}
       try { dashPlayer?.reset?.(); } catch (_) {}
       try { art?.destroy?.(false); } catch (_) {}

@@ -100,9 +100,22 @@ export async function startDanmaku({ layer, video, context, config, log }) {
 
 async function fetchXmlDanmaku(cid, log) {
   if (!cid) return [];
-  const resp = await fetch('https://comment.bilibili.com/' + cid + '.xml', { credentials: 'include' });
-  if (!resp.ok) throw new Error('danmaku xml failed: HTTP ' + resp.status);
-  const text = await resp.text();
+  const url = 'https://comment.bilibili.com/' + cid + '.xml';
+  let text = '';
+  try {
+    const resp = await fetch(url, { credentials: 'include' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    text = await resp.text();
+  } catch (err) {
+    log.warn('direct danmaku xml failed, retry by background', err);
+    const resp = await chrome.runtime.sendMessage({
+      type: 'BRX_PLAYER_ACTION',
+      action: 'FETCH_TEXT',
+      payload: { url },
+    });
+    if (!resp?.ok) throw new Error('danmaku xml failed: ' + (resp?.message || 'unknown'));
+    text = resp.text || '';
+  }
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   const items = [...doc.querySelectorAll('d')]
     .slice(0, 8000)
