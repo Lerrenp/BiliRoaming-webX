@@ -2,7 +2,7 @@ import { BRX } from '../common/constants.mjs';
 import { createLogger } from '../common/logger.mjs';
 import { stripAreaLimitUi } from '../common/dom.mjs';
 import { PageBridge, sendRuntime } from './bridge.mjs';
-import { mountPlayer } from './player/visionController.mjs';
+import { mountPlayer } from './player/mountPlayer.mjs';
 
 const log = createLogger('[BRX-Player CONTENT]');
 let currentController = null;

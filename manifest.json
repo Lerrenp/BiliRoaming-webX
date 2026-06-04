@@ -61,7 +61,7 @@
         "src/content/bridge.mjs",
         "src/content/player/dashMpdBuilder.mjs",
         "src/content/player/qualityPanel.mjs",
-        "src/content/player/visionController.mjs",
+        "src/content/player/mountPlayer.mjs",
         "src/content/danmaku/engineController.mjs",
         "src/common/constants.mjs",
         "src/common/logger.mjs",
