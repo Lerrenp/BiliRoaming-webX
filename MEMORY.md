@@ -272,3 +272,105 @@ vendor/
 - ❌ `2cff62f` VisionPlayer controller commit（跳过）
 - ❌ `5389c2c` VisionPlayer bug 修复 commit（跳过）
 
+---
+
+## 2026-06-04 BiliRoaming 公共服务端巡查（**部署前提调研**）
+
+### 巡查结论
+**2026-06-04 公共 BiliRoaming 服务端大面积失效**。`baseline/SERVER_TEST_RESULTS.md` 记录的"✅ code:0"已不再适用。
+
+### 各服务端状态对照（curl 实测）
+
+| 服务端 | 状态 | 错误码 | 备注 |
+|---|---|---|---|
+| `bili.xcnya.cn` | ❌ 死 | `-500 Client request failed Step 2` | 服务端到 B 站 `reqwest::Client::send()` 网络层失败（`BiliRoaming-Rust-Server-main/src/mods/request.rs:60`）|
+| `bili.nepnep.moe` | ⚠️ 半活 | `-101 未登录` / `-500` | 偶尔能处理请求但鉴权不通过 |
+| `atri.ink`（Go 实现）| ⚠️ 半活 | `401 解析服务器: 账号未登录！` | 用自己的鉴权体系，忽略 B 站 access_key |
+| `bili.global.ssl.fastly.net` | ❌ 域不存在 | Fastly error | 已废弃 |
+| `bili.udplog.com` | ❌ 不通 | Connection timeout | 已失效 |
+| `bili.afoolishfox.com` | ❌ 不通 | TLS error | 证书问题 |
+| `bili.snm0516.aisee.tv` | ❌ 不通 | DNS 解析失败 | 已失效 |
+| `bili.majiawebtest.dpdns.org` | ✅ 通 | `code:0` + 30KB 真实 DASH | **用户自建服务器，仅作开发测试** |
+
+### 关键根因（`bili.xcnya.cn` 为例）
+**`Client request failed Step 2`** = BiliRoaming Rust 服务端 `reqwest::Client::send()` 失败。代码在 `BiliRoaming-Rust-Server-main/src/mods/request.rs:60`：
+```rust
+let rsp_raw_data = if let Ok(value) = client.send().await {
+    value
+} else {
+    return Err(EType::ServerReqError("Client request failed Step 2"));
+};
+```
+网络层错误（DNS/TCP/TLS/IP 封禁/代理配置都可能），与请求参数无关。
+
+### 模式说明
+**web 模式 / app 模式** 在用户自建服务器上 **web 模式即通**（不需要 access_key/sign/特殊 UA）。不同服务端支持不同的模式组合：
+- 公共 xcnya：web + App 长 key（来自 PROJECT_MEMORY.md 2026-06-03 记录）
+- 用户自建 majiawebtest：web 模式 + 浏览器标准 UA 即通
+- 其他服务端：模式各异
+
+**结论**：扩展必须**支持 web/app 模式切换 + 地区切换**（用户配置项），不能写死。
+
+### 对 v0.3 切换 ArtPlayer 的影响
+✅ **无关**。这是**部署侧问题**（服务端网络），不是**代码侧问题**（播放器内核）。无论用 VisionPlayer 还是 ArtPlayer，**服务端不通都播不了**。
+
+### POPUP 配置示例（开发测试，web 模式 + 用户自建）
+```
+serverBaseUrl: https://bili.majiawebtest.dpdns.org
+clientMode: web  ← 当前测试用 web 模式
+area: hk
+accessKey: （空）
+```
+
+---
+
+## 2026-06-04 下一步计划：扩展 Options UI（模式/地区配置）
+
+### 背景
+当前 popup 已包含 `serverBaseUrl` / `area` / `accessKey` / `clientMode` 等基础配置，但**用户难发现/难操作**。不同 BiliRoaming 服务端支持的模式/地区组合不同，需要：
+- **可视化**的配置页面
+- **测试按钮**（验证当前配置能否拿到 playurl）
+- **模式/地区可选项 UI**（不写死）
+
+### 计划任务
+
+#### P0-1：扩展 Options Page（`src/options/options.html`）
+- 完整配置 UI（替代当前 popup 的部分功能）
+- 字段：
+  - **服务端地址**（serverBaseUrl）：文本输入 + 候选下拉
+  - **客户端模式**（clientMode）：单选 `web` / `app`
+  - **区域**（area）：单选 `hk` / `tw` / `cn` / `th`
+  - **access_key**：文本输入 + "从当前页 localStorage 读取" 按钮
+  - **默认清晰度 / 编码**：下拉
+  - **弹幕开关 / 引擎 / 透明度 / 速度**：复选 + 滑块
+
+#### P0-2：模式/地区智能推荐
+- 根据服务端 URL 自动推荐模式（如 `bili.majiawebtest.*` → web；`bili.xcnya.*` → app）
+- 提供"测试当前配置"按钮：发一个最小 playurl 请求，code:0 算通过
+
+#### P0-3：配置导入/导出
+- 方便用户备份/分享配置
+- 配合 manifest 更新提示（升级时迁移旧配置）
+
+#### 验收
+- 用户打开 `chrome://extensions` → "BiliRoaming-X Player" → "选项"
+- 能看到完整配置 UI，所有字段可编辑
+- 保存后立即生效（无需重启扩展）
+- "测试"按钮能在 5s 内返回 code:0/非 0 结果
+
+### 关联文件
+```
+src/options/
+├── options.html        # 现有 1 行（待扩展）
+├── options.css         # 新增
+└── options.mjs         # 新增
+src/popup/popup.html   # 保留作为快速开关面板
+```
+
+### v0.3 当前未实现的部分
+- ❌ src/options/options.html 仍是占位
+- ❌ src/options/options.css 不存在
+- ❌ src/options/options.mjs 不存在
+- ❌ POPUP 没有"测试配置"按钮
+- ❌ 没有模式/地区候选下拉
+
