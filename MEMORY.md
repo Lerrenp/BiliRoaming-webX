@@ -211,12 +211,24 @@ const player = await mountBiliDashPlayer({
 
 ## Git 历史（截至 2026-06-04）
 
+### main 分支（4 commits）
 ```
 5389c2c fix: prevent duplicate player instances          (Codex, 14:59)
 2cff62f feat: integrate VisionPlayer playback controller  (Codex, 14:51)
 ad3e1bc feat: add dash player MVP with episode highlight   (Codex, 14:40)
 1afc844 chore: init biliExtensionsplayer repo (ESM MV3)    (Codex, 01:44)
 ```
+
+### v0.3-artplayer-migration 分支（4 commits，**当前工作分支**）
+```
+dbf192e refactor: rename visionController.mjs to mountPlayer.mjs   (Codex, 21:34)
+eb29e17 chore: remove unused visionplayer.streaming.mjs vendor      (Codex, 21:31)
+94a79c2 docs: v0.3 technology switch evaluation (VisionPlayer to ArtPlayer)  (Codex, 21:26)
+ad3e1bc feat: add dash player MVP with episode highlight             (Codex, 14:40)  ← 起点
+1afc844 chore: init biliExtensionsplayer repo (ESM MV3)              (Codex, 01:44)
+```
+
+**注**：v0.3 分支跳过 `2cff62f`（VisionPlayer 接入）和 `5389c2c`（VisionPlayer 引起的 bug 修复），因为切到 ArtPlayer 后根因消失。
 
 ### 分支状态
 - 当前分支：`main`（无其他分支）
@@ -235,4 +247,28 @@ ad3e1bc feat: add dash player MVP with episode highlight   (Codex, 14:40)
 - 已经在第 4 个 commit 就遇到 VisionPlayer 状态机问题（暂停音频残留）
 - 决策窗口：是否继续修 VisionPlayer，还是切换到 ArtPlayer
 - **结论：切换**（ArtPlayer 内置 destroy 生命周期，根因上解决音频残留）
+
+### 当前文件清单（v0.3-artplayer-migration）
+```
+src/content/player/
+├── dashMpdBuilder.mjs    # B 站 v2 JSON → MPD（保留，领域适配器）
+├── mountPlayer.mjs       # 原 visionController.mjs（已改名，匹配 mountPlayer 导出）
+├── qualityPanel.mjs      # 自写清晰度/编码/音轨面板（v0.4 替换为 plugin-dash-control）
+└── (未来)
+    └── biliDashProvider/ # v0.3 后续：封装层
+
+src/content/danmaku/
+└── engineController.mjs  # danmaku-lite 启动（v0.4 替换为 plugin-danmuku）
+
+vendor/
+├── dash.all.min.js       # MSE 引擎（永久保留）
+├── dash.all.min.mjs      # ESM 版本（永久保留）
+└── danmaku-lite.canvas.mjs  # v0.4 删除
+```
+
+### v0.3 当前已删
+- ❌ `vendor/visionplayer.streaming.mjs` (2.9MB 死代码)
+- ❌ `vendor/visionplayer.mjs` (从未引入)
+- ❌ `2cff62f` VisionPlayer controller commit（跳过）
+- ❌ `5389c2c` VisionPlayer bug 修复 commit（跳过）
 
