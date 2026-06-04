@@ -1,6 +1,5 @@
 import { waitForElement, stripAreaLimitUi } from '../../common/dom.mjs';
 import { extractDash, uniqueQualities, uniqueCodecs, audioOptions, createMpdUrl, selectStreams } from './dashMpdBuilder.mjs';
-import { createQualityPanel } from './qualityPanel.mjs';
 
 export async function mountPlayer({ playurl, context, config, log }) {
   const dash = extractDash(playurl);
@@ -46,8 +45,6 @@ export async function mountPlayer({ playurl, context, config, log }) {
   let art = null;
   let dashPlayer = null;
   let resizeObserver = null;
-  const panel = createQualityPanel({ qualities, codecs, audios, initial: selection, onChange: reloadWithSelection });
-  root.appendChild(panel);
 
   function nextMpdUrl() {
     if (mpdObjectUrl) URL.revokeObjectURL(mpdObjectUrl);
@@ -120,7 +117,6 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   async function reloadWithSelection(next) {
     selection = next;
-    panel.__brxSetSelection?.(selection);
     const video = art?.video;
     const t = video?.currentTime || 0;
     const paused = video ? video.paused : false;
@@ -160,6 +156,22 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   function createArtPlugins() {
     const plugins = [];
+    if (window.artplayerPluginDanmuku) {
+      const cid = context?.cid;
+      const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
+      plugins.push(window.artplayerPluginDanmuku({
+        danmuku: danmukuUrl,
+        speed: 5,
+        opacity: 0.9,
+        fontSize: 25,
+        antiOverlap: true,
+        synchronousPlayback: true,
+        visible: true,
+        emitter: false,
+        heatmap: false,
+        filter: (danmu) => danmu.text.trim().length > 0,
+      }));
+    }
     if (window.artplayerPluginDocumentPip) {
       plugins.push(window.artplayerPluginDocumentPip({ width: 640, height: 360, fallbackToVideoPiP: false, placeholder: '正在以画中画播放' }));
     }
@@ -207,5 +219,5 @@ async function ensureVendorLoaded() {
 }
 
 function cssText() {
-  return `.brx-player-root{position:absolute;inset:0;z-index:999;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.brx-artplayer-box{position:absolute;inset:0;background:#000}.brx-artplayer-box .artplayer{width:100%!important;height:100%!important}.brx-status{position:absolute;left:14px;top:12px;z-index:35;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;transition:opacity .35s}.brx-quality-panel{position:absolute;right:12px;top:12px;z-index:36;display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.62);padding:8px;border-radius:8px;backdrop-filter:blur(4px);opacity:.25;transition:opacity .2s}.brx-quality-panel:hover{opacity:1}.brx-quality-panel label{font-size:12px;color:#fff;display:flex;gap:4px;align-items:center}.brx-quality-panel select{background:#18191c;color:#fff;border:1px solid #555;border-radius:4px;padding:3px 5px}`;
+  return `.brx-player-root{position:absolute;inset:0;z-index:999;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.brx-artplayer-box{position:absolute;inset:0;background:#000}.brx-artplayer-box .artplayer{width:100%!important;height:100%!important}.brx-status{position:absolute;left:14px;top:12px;z-index:35;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;transition:opacity .35s}`;
 }

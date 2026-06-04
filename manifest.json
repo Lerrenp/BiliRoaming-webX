@@ -44,6 +44,7 @@
         "vendor/dash.all.min.js",
         "vendor/artplayer.js",
         "vendor/artplayer-plugin-dash-control.js",
+        "vendor/artplayer-plugin-danmuku.js",
         "vendor/artplayer-plugin-document-pip.js",
         "src/content/content.js"
       ],
@@ -63,7 +64,6 @@
         "src/content/app.mjs",
         "src/content/bridge.mjs",
         "src/content/player/dashMpdBuilder.mjs",
-        "src/content/player/qualityPanel.mjs",
         "src/content/player/mountPlayer.mjs",
         "src/common/constants.mjs",
         "src/common/logger.mjs",
@@ -72,6 +72,7 @@
         "vendor/dash.all.min.mjs",
         "vendor/artplayer.js",
         "vendor/artplayer-plugin-dash-control.js",
+        "vendor/artplayer-plugin-danmuku.js",
         "vendor/artplayer-plugin-document-pip.js"
       ],
       "matches": [
