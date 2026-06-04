@@ -1,26 +1,44 @@
 # biliExtensionsplayer 子项目记忆
 
-> 更新时间：2026-06-04
+> 更新时间：2026-06-05
 > 项目：`D:\claude-code\project\bilibili项目\biliExtensionsplayer`
 
 ## 当前基线
 
-已提交 MVP：
+v0.3-artplayer-migration 分支，HEAD：
 
 ```text
-ad3e1bc feat: add dash player MVP with episode highlight
+11afe38 feat: integrate artplayer-plugin-danmuku, remove qualityPanel
 ```
 
-MVP 已验证能力：
+已落地能力（v0.3 累计 11 commits）：
 
 - MV3 扩展可加载。
 - MAIN world 可检测 B 站受限页并拦截选集。
-- background 可请求 BiliRoaming 服务端。
-- B 站 DASH JSON 可转 MPD Blob。
-- dash.js 临时播放器可播放。
-- 右上角已有清晰度 / 编码 / 音轨选择。
+- background 可请求 BiliRoaming 服务端（FETCH_PLAYURL）。
+- B 站 DASH JSON 可转 MPD Blob（`dashMpdBuilder.mjs`）。
+- ArtPlayer 5.4.1 接管 video 状态机（destroy 生命周期可靠）。
+- `artplayer-plugin-danmuku` + `artplayer-plugin-dash-control` 取代自写控件。
 - 选集点击后右侧集数高亮已修复。
 - access_key 辅助读取已并入 popup。
+
+## 当前问题
+
+**PGC 番剧页弹幕 API 请求参数错误**（2026-06-05 实测）：
+
+- 现象：在 `https://www.bilibili.com/bangumi/play/ep713699`（港澳台限定番剧），
+  ArtPlayer 接管播放成功（`blob:...` 视频源就绪，时长 1501s），
+  但 `<div class="art-danmuku">` 始终为空，零弹幕。
+- 根因：插件向 `https://api.bilibili.com/x/v2/dm/web/view` 发起的请求中
+  `oid=null`、`pid=null`、`duration=0`（注意是字符串 "null"），
+  B 站返回 `{"code":-400,"message":"请求错误"}`。
+- 推断：插件在 PGC 场景下没有正确读取分集 `cid`，
+  `String(null)` 被直接拼到 URL，**没有空值校验**。
+- 影响范围：仅 PGC 番剧（`type=1`），UGC 视频可能正常（待回归）。
+- 修复方向：从 `pgc/season/episode/web/info` 返回中取 `cid`（已请求过），
+  或者从 `__INITIAL_STATE__` / `__NEXT_DATA__` 读 `epInfo.cid`；
+  拼接 URL 前做空值校验，cid 缺失时跳过弹幕加载而不是发 "null"。
+
 
 ## 当前问题
 
@@ -373,4 +391,48 @@ src/popup/popup.html   # 保留作为快速开关面板
 - ❌ src/options/options.mjs 不存在
 - ❌ POPUP 没有"测试配置"按钮
 - ❌ 没有模式/地区候选下拉
+
+---
+
+## 2026-06-05 弹幕 cid 取值调试
+
+### 现象
+测试 URL：`https://www.bilibili.com/bangumi/play/ep713699`（虚構推理 S2 EP1，港澳台限定）
+扩展：`chrome-extension://icdiokjcfhmbnmempcnllbldmlpibpmh/`（BRX-Player）
+
+### Playwright-cli 实测
+- 命令：`playwright-cli open https://www.bilibili.com/bangumi/play/ep713699 --headed --persistent`
+- 浏览器：default（pid 38180），headed + persistent
+
+### 现场数据
+| 项目 | 值 |
+|---|---|
+| 官方播放器 | 灰屏 + "非常抱歉，根据版权方要求，您所在的地区无法观看本片" |
+| 官方 `<video>` | `src=""`, `readyState=0`, paused |
+| ArtPlayer `<video>` | `blob:https://www.bilibili.com/be4a0d7c-...`, `readyState=4`, `duration=1501`, `currentTime=10.63` |
+| `.art-danmuku` innerHTML | `""`（0 个子元素） |
+| console | 0 errors, 2 warnings（核心警告与 B 站播放器无关） |
+
+### 失败的弹幕请求
+```http
+GET https://api.bilibili.com/x/v2/dm/web/view
+    ?type=1
+    &oid=null          ← 字符串 "null"，应为数字 cid
+    &pid=null          ← 字符串 "null"
+    &duration=0        ← 应为 1501
+    &without_subtitle=true
+
+→ 200 {"code":-400,"message":"请求错误","ttl":1}
+```
+
+### 已请求过的相关接口
+- `https://api.bilibili.com/pgc/season/episode/web/info?ep_id=713699` → 200（应含 `cid`）
+- `https://api.bilibili.com/pgc/view/web/ep/list?ep_id=713699` → 200（应含 `cid`）
+- `https://api.bilibili.com/ogv/player/pre/check/drm?drm_tech_type=2` → 200
+
+### 修复要点（下一步）
+1. 定位 `vendor/artplayer-plugin-danmuku.js`（或被引用的 main world script）里构造 `oid` 的代码段。
+2. 在 PGC 场景下，从 `pgc/season/episode/web/info` 的 `result.cid` / `epInfo.cid` 取值。
+3. 拼接 URL 前判断 `cid` 是否为合法 number，非法则 `console.warn` 后**直接 return**，不发请求。
+4. UGС 场景回归：确保 `oid=av号` 仍走原路径，不被 PGC 分支误伤。
 
