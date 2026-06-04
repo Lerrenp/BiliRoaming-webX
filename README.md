@@ -2,6 +2,21 @@
 
 独立重构项目（不是 `bilibiliExtensions` 的附属仓库）。
 
+## 许可证
+
+本项目基于 **GNU General Public License v3.0**（GPL-3.0）发布，详见 [`LICENSE`](./LICENSE) 文件。
+
+许可证选型依据（2026-06-05 落定）：
+
+- 与上游 BiliRoaming（[bili-roaming](https://github.com/yujincheng08/BiliRoaming)）协议保持一致，**GPL-3.0**
+- 与上游 BiliRoaming-Rust-Server 同协议
+- 所有 vendor 代码许可（ArtPlayer MIT、dash.js BSD、danmaku-lite MIT、VisionPlayer MIT）均与 GPL-3.0 兼容
+- 防御性 copyleft：阻止闭源 fork，保证衍生作品继续开源
+- 不采用 AGPL-3.0：本项目是用户侧浏览器扩展，不向第三方提供网络服务，AGPL 的网络 copyleft 条款不适用
+- 不采用 MIT/Apache：与上游 BiliRoaming 生态不一致，无法防止商业闭源再分发
+
+第三方依赖的版权与许可信息保留在各 vendor 文件的源码注释中。
+
 > **v0.3 修订（2026-06-04）**：播放器内核从 VisionPlayer 切换为 **ArtPlayer 5.4.1**，弹幕从 danmaku-lite 切换为 **artplayer-plugin-danmuku**。详见 `PLAN.md` §0 修订记录 和 `MEMORY.md`。
 
 ## 项目性质
