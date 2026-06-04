@@ -167,11 +167,10 @@ export async function mountPlayer({ playurl, context, config, log }) {
   }
 
   function createArtPlugins() {
-    if (!window.artplayerPluginDashControl) return [];
-    return [window.artplayerPluginDashControl({
-      quality: { control: false, setting: false, getName: (level) => `${level.height || level.bitrate || ''}P`, title: 'DASH 清晰度', auto: '自动' },
-      audio: { control: false, setting: false, getName: (track) => track.lang || track.id || '音轨', title: 'DASH 音轨', auto: '自动' },
-    })];
+    // v1.1.0 dash-control expects dash.js v3 API (getBitrateInfoListFor).
+    // Current bundled dash.js is v5, and the plugin throws on ArtPlayer ready.
+    // Manual BRX quality settings above already provide qn/codec/audio switching.
+    return [];
   }
 
   function labelSelection(sel) {
@@ -205,5 +204,5 @@ async function ensureVendorLoaded() {
 }
 
 function cssText() {
-  return `.brx-player-root{position:absolute;inset:0;z-index:999;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.brx-artplayer-box{position:absolute;inset:0;background:#000}.brx-artplayer-box .artplayer{width:100%!important;height:100%!important}.brx-danmaku-layer{position:absolute;inset:0;pointer-events:none;z-index:31;overflow:hidden}.brx-status{position:absolute;left:14px;top:12px;z-index:35;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;transition:opacity .35s}.brx-quality-panel{position:absolute;right:12px;top:12px;z-index:36;display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.62);padding:8px;border-radius:8px;backdrop-filter:blur(4px);opacity:.25;transition:opacity .2s}.brx-quality-panel:hover{opacity:1}.brx-quality-panel label{font-size:12px;color:#fff;display:flex;gap:4px;align-items:center}.brx-quality-panel select{background:#18191c;color:#fff;border:1px solid #555;border-radius:4px;padding:3px 5px}`;
+  return `.brx-player-root{position:absolute;inset:0;z-index:999;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.brx-artplayer-box{position:absolute;inset:0;background:#000}.brx-artplayer-box .artplayer{width:100%!important;height:100%!important}.brx-danmaku-layer{position:absolute;inset:0;pointer-events:none;z-index:31;overflow:hidden;width:100%;height:100%;contain:layout paint}.brx-status{position:absolute;left:14px;top:12px;z-index:35;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;transition:opacity .35s}.brx-quality-panel{position:absolute;right:12px;top:12px;z-index:36;display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.62);padding:8px;border-radius:8px;backdrop-filter:blur(4px);opacity:.25;transition:opacity .2s}.brx-quality-panel:hover{opacity:1}.brx-quality-panel label{font-size:12px;color:#fff;display:flex;gap:4px;align-items:center}.brx-quality-panel select{background:#18191c;color:#fff;border:1px solid #555;border-radius:4px;padding:3px 5px}`;
 }
