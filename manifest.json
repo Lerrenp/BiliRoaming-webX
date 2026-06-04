@@ -74,7 +74,8 @@
         "vendor/dash.all.min.mjs",
         "vendor/artplayer.js",
         "vendor/artplayer-plugin-dash-control.js",
-        "vendor/artplayer-plugin-document-pip.js"
+        "vendor/artplayer-plugin-document-pip.js",
+        "src/content/danmaku/danmakuControl.mjs"
       ],
       "matches": [
         "*://*.bilibili.com/*"

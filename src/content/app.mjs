@@ -35,13 +35,20 @@ async function handleStart(payload, reason) {
   const cfg = await sendRuntime('GET_CONFIG', {});
   if (!cfg.enabled) return;
 
-  const context = payload.context || {};
+  let context = { ...(payload.context || {}) };
+  if (context.epId) {
+    try {
+      context = Object.assign(context, await sendRuntime('FETCH_EP_INFO', { epId: context.epId }));
+    } catch (err) {
+      log.warn('fetch episode info failed', context.epId, err);
+    }
+  }
   if (context.epId) {
     currentEpId = Number(context.epId);
     updateEpisodeHighlight(currentEpId);
   }
 
-  const key = [context.epId, context.cid, location.href].join(':');
+  const key = [context.epId || '', context.cid || ''].join(':');
   if (key === lastKey && currentController) return;
   if (!context.epId && !context.cid) return;
   lastKey = key;

@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from '../common/constants.mjs';
-const ids = ['enabled', 'serverBaseUrl', 'clientMode', 'area', 'accessKey', 'defaultQn', 'defaultCodec', 'defaultAudioId', 'danmakuEnabled', 'danmakuArea', 'danmakuOpacity', 'danmakuFontSize', 'danmakuSpeed'];
+const ids = ['enabled', 'serverBaseUrl', 'clientMode', 'area', 'accessKey', 'defaultQn', 'defaultCodec', 'defaultAudioId'];
 const $ = (id) => document.getElementById(id);
 
 async function load() {
@@ -11,8 +11,7 @@ async function load() {
     if (el.type === 'checkbox') el.checked = !!value;
     else el.value = value;
   }
-  updateOpacityText();
-  $('status').textContent = 'ArtPlayer 版本：清晰度/编码/音轨/弹幕配置已启用';
+  $('status').textContent = 'ArtPlayer 播放器配置已启用';
 }
 
 async function save() {
@@ -22,10 +21,6 @@ async function save() {
     if (!el) continue;
     patch[id] = el.type === 'checkbox' ? el.checked : el.value;
   }
-  patch.danmakuOpacity = Number(patch.danmakuOpacity || DEFAULT_CONFIG.danmakuOpacity);
-  patch.danmakuArea = Number(patch.danmakuArea || DEFAULT_CONFIG.danmakuArea);
-  patch.danmakuFontSize = Number(patch.danmakuFontSize || DEFAULT_CONFIG.danmakuFontSize);
-  patch.danmakuSpeed = Number(patch.danmakuSpeed || DEFAULT_CONFIG.danmakuSpeed);
   await chrome.runtime.sendMessage({ type: 'BRX_PLAYER_ACTION', action: 'SET_CONFIG', payload: patch });
   $('status').textContent = '已保存。新配置会在下次加载/切集时生效';
 }
@@ -48,12 +43,8 @@ async function reloadActiveTab() {
   window.close();
 }
 
-function updateOpacityText() {
-  $('opacityText').textContent = Math.round(Number($('danmakuOpacity').value || 0) * 100) + '%';
-}
 
 $('save').addEventListener('click', save);
 $('readKey').addEventListener('click', readKey);
 $('reload').addEventListener('click', reloadActiveTab);
-$('danmakuOpacity').addEventListener('input', updateOpacityText);
 load();
