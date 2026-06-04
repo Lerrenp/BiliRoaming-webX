@@ -919,6 +919,59 @@ window.__BRX_DEBUG__ = {
 
 ---
 
+## 十一.B 下一步计划：扩展 Options UI（2026-06-04 新增）
+
+### 背景
+2026-06-04 巡查发现公共 BiliRoaming 服务端大面积失效，用户自建服务端（如 `bili.majiawebtest.dpdns.org`）能用 web 模式 + 浏览器标准 UA 直接通。**这要求扩展必须支持**：
+- **客户端模式切换**（web / app）：不同服务端支持不同
+- **地区切换**（hk / tw / cn / th）：不同区域权限不同
+- **可视化配置**：用户友好
+
+### 任务 P4-1：Options Page 完整 UI（1d）
+- 扩展 `src/options/options.html`（当前是占位文件）
+- 新增 `src/options/options.css`（样式）
+- 新增 `src/options/options.mjs`（业务逻辑）
+- 字段：
+  - **服务端地址**（serverBaseUrl）：文本输入 + 候选下拉（xcnya/nepnep/atri/majiawebtest）
+  - **客户端模式**（clientMode）：单选 `web` / `app`
+  - **区域**（area）：单选 `hk` / `tw` / `cn` / `th`
+  - **access_key**：文本输入 + "从当前页 localStorage 读取" 按钮
+  - **默认清晰度 / 编码**：下拉
+  - **弹幕开关 / 引擎 / 透明度 / 速度**：复选 + 滑块
+
+### 任务 P4-2：模式/地区智能推荐（0.5d）
+- 根据 serverBaseUrl 自动推荐默认模式：
+  - `bili.majiawebtest.*` / `nepnep.*` → web
+  - `bili.xcnya.*` → app
+- "测试当前配置"按钮：发一个最小 playurl 请求，5s 内返回 code:0/非 0 结果
+- 显示当前推荐的"基线配置"
+
+### 任务 P4-3：配置导入/导出（0.3d）
+- 一键导出 JSON 配置
+- 一键导入 JSON 配置
+- 配置版本号（升级时迁移）
+
+### 关联文件
+```
+src/options/
+├── options.html        # 现有 1 行占位（待扩展）
+├── options.css         # 新增
+└── options.mjs         # 新增
+src/popup/popup.html   # 保留作为快速开关面板
+```
+
+### 验收标准
+- [ ] `chrome://extensions` → "BiliRoaming-X Player" → "选项" 打开完整 UI
+- [ ] 模式/地区/服务端地址 可视化切换
+- [ ] "测试配置"按钮 5s 内返回 code:0/非 0
+- [ ] 配置保存后立即生效（无需重启扩展）
+- [ ] 配置文件可导入/导出
+
+### 与 v0.3 切换 ArtPlayer 关系
+✅ **无关**，是独立任务。Options UI 在 v0.3（原生 video）阶段就有用，在 v0.4（ArtPlayer）阶段继续保留。
+
+---
+
 ## 十二、风险与对策（v0.3 修订）
 
 ### 12.1 风险表
