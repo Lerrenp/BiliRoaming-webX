@@ -26,9 +26,9 @@ export class SubtitleManager {
     if(this._uiBuilt){this._updateToggleState();this._renderPanel()};return this.tracks;
   }
 
-  switchTo(idx){if(idx<-1||idx>=this.tracks.length)return;this.currentIndex=idx;this._apply();if(this._uiBuilt){this._updateToggleState();this._renderPanel()};}
-  show(){if(this.tracks.length===0)return;if(this.currentIndex===-1)this.currentIndex=0;this._apply();if(this._uiBuilt){this._updateToggleState();this._renderPanel()};}
-  hide(){this.currentIndex=-1;this._apply();if(this._uiBuilt){this._updateToggleState();this._renderPanel()};}
+  switchTo(idx){if(idx<-1||idx>=this.tracks.length)return;this.currentIndex=idx;this._apply();if(this._uiBuilt)this._updateAfterToggle();}
+  show(){if(this.tracks.length===0)return;if(this.currentIndex===-1)this.currentIndex=0;this._apply();if(this._uiBuilt)this._updateAfterToggle();}
+  hide(){this.currentIndex=-1;this._apply();if(this._uiBuilt)this._updateAfterToggle();}
   isOff(){return this.currentIndex===-1;}
 
   dispose(){
@@ -105,6 +105,19 @@ export class SubtitleManager {
 
     this._ui={panel};this._uiBuilt=true;
     this._updateToggleState();this._renderPanel();
+  }
+
+  // 增量更新面板（不重建 DOM）：开关状态 + 选集勾选
+  _updateAfterToggle(){
+    this._updateToggleState();
+    const p=this._ui?.panel;if(!p)return;
+    // 主开关
+    const $sw=p.querySelector('#brx-sub-main-toggle');
+    if($sw)$sw.classList.toggle('on',!this.isOff());
+    // 选集勾选
+    p.querySelectorAll('.brx-sub-item[data-idx]').forEach(el=>{
+      el.classList.toggle('current',Number(el.dataset.idx)===this.currentIndex);
+    });
   }
 
   _updateToggleState(){
