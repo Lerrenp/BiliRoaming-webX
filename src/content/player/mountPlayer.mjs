@@ -107,10 +107,14 @@ export async function mountPlayer({ playurl, context, config, log }) {
     plugins: createArtPlugins(),
   });
 
+  // 字幕按钮随播放器一起初始化，不用等 ready
+  // SubtitleManager 内部用 art.controls.add 挂到 controlsRight
+  buildSubtitleControl();
+  // 字幕数据异步拉，不阻塞 ready
+  loadSubtitle().catch(() => {});
+
   art.on('ready', async () => {
     installResizeRelay();
-    buildSubtitleControl();
-    await loadSubtitle();
     window.__BRX_PLAYER_DEBUG__ = Object.assign(window.__BRX_PLAYER_DEBUG__ || {}, { art, dashPlayer });
   });
 
