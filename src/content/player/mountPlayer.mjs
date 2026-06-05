@@ -225,12 +225,17 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   let dmSaveTimer = null;
   function installDanmakuPersistence() {
-    // 从插件实例读取真实 option，定时全量保存
-    dmSaveTimer = setInterval(() => {
+    // ArtPlayer 插件挂在 art.plugins 上，属性名是 plugin 返回值的 name
+    const readOpt = () => {
       try {
-        const dm = art.plugins?.cache?.get?.('artplayerPluginDanmuku');
-        if (!dm?.option) return;
-        const opt = dm.option;
+        const p = art.plugins || {};
+        const inst = p.artplayerPluginDanmuku || p.danmuku;
+        return inst?.option || null;
+      } catch (_) { return null; }
+    };
+    const save = () => {
+      const opt = readOpt(); if (!opt) return;
+      try {
         chrome.storage.sync.set({ brx_danmaku: {
           visible: opt.visible !== false,
           speed: opt.speed,
@@ -238,10 +243,12 @@ export async function mountPlayer({ playurl, context, config, log }) {
           fontSize: opt.fontSize,
           antiOverlap: opt.antiOverlap,
           synchronousPlayback: opt.synchronousPlayback,
-          modes: opt.modes ? [...opt.modes] : [0,1,2],
+          modes: Array.isArray(opt.modes) ? [...opt.modes] : [0,1,2],
         }});
       } catch (_) {}
-    }, 3000);
+    };
+    save();
+    dmSaveTimer = setInterval(save, 3000);
   }
 
   function onGlobalFullscreenChange() {}
