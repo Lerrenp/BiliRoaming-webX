@@ -145,20 +145,39 @@ export class SubtitleManager {
 
     const $t=panel.querySelector('#brx-sub-main-toggle');if($t)$t.addEventListener('click',()=>{if(this.isOff())this.show();else this.hide();});
     panel.querySelectorAll('.brx-sub-item[data-idx]').forEach(el=>{el.addEventListener('click',()=>{this.switchTo(Number(el.dataset.idx));panel.classList.remove('open');});});
-    const $cr=panel.querySelector('#brx-sub-conv-row');if($cr)$cr.addEventListener('click',()=>{this._convOpen=!this._convOpen;this._styleOpen=false;this._renderPanel();});
-    panel.querySelectorAll('.brx-sub-item[data-conv]').forEach(el=>{el.addEventListener('click',()=>{this.convMode=el.dataset.conv;this._apply();this._convOpen=false;this._renderPanel();});});
-    const $sb=panel.querySelector('#brx-sub-settings-btn');if($sb)$sb.addEventListener('click',()=>{this._styleOpen=!this._styleOpen;this._convOpen=false;this._renderPanel();});
 
-    // 滑块：input 只改值+生效（不重建面板），change 拖完才刷新面板
+    // 展开/折叠用 class toggle 直操作，不重建 DOM（否则 panel 消失）
+    const $cr=panel.querySelector('#brx-sub-conv-row');
+    if($cr)$cr.addEventListener('click',()=>{this._convOpen=!this._convOpen;this._styleOpen=false;this._toggleSubMenus();});
+    panel.querySelectorAll('.brx-sub-item[data-conv]').forEach(el=>{el.addEventListener('click',()=>{this.convMode=el.dataset.conv;this._apply();this._convOpen=false;this._toggleSubMenus();this._updateConvLabel();});});
+    const $sb=panel.querySelector('#brx-sub-settings-btn');
+    if($sb)$sb.addEventListener('click',()=>{this._styleOpen=!this._styleOpen;this._convOpen=false;this._toggleSubMenus();});
+    // 颜色点击只刷新颜色区的 active，不重建面板
+    panel.querySelectorAll('.brx-sub-color-dot').forEach(el=>{el.addEventListener('click',()=>{this.style.color=el.dataset.color;this._apply();this._updateColorDots();});});
+
+    // 滑块：input 只改值+生效，不重建面板
     const $fs=panel.querySelector('#brx-sub-fontsize');
-    if($fs){$fs.addEventListener('input',()=>{this.style.fontSize=Number($fs.value);this._apply();this._updateSliderSpan('brx-sub-fontsize-val',this.style.fontSize+'px');});
-      $fs.addEventListener('change',()=>{this._renderPanel();});}
+    if($fs){$fs.addEventListener('input',()=>{this.style.fontSize=Number($fs.value);this._apply();this._updateSliderSpan('brx-sub-fontsize-val',this.style.fontSize+'px');});}
     const $po=panel.querySelector('#brx-sub-position');
-    if($po){$po.addEventListener('input',()=>{this.style.bottom=Number($po.value);this._apply();this._updateSliderSpan('brx-sub-pos-val',this.style.bottom+'%');});
-      $po.addEventListener('change',()=>{this._renderPanel();});}
-    panel.querySelectorAll('.brx-sub-color-dot').forEach(el=>{el.addEventListener('click',()=>{this.style.color=el.dataset.color;this._apply();this._renderPanel();});});
+    if($po){$po.addEventListener('input',()=>{this.style.bottom=Number($po.value);this._apply();this._updateSliderSpan('brx-sub-pos-val',this.style.bottom+'%');});}
   }
 
+  _toggleSubMenus(){
+    const p=this._ui?.panel;if(!p)return;
+    const $m=p.querySelector('#brx-sub-conv-menu');if($m)$m.classList.toggle('open',this._convOpen);
+    const $s=p.querySelector('#brx-sub-settings-panel');if($s)$s.classList.toggle('open',this._styleOpen);
+  }
+  _updateConvLabel(){
+    const p=this._ui?.panel;if(!p)return;
+    const cl=this.convMode==='none'?'不转换':(this.convMode==='s2t'?'简体转繁体':'繁体转简体');
+    const $l=p.querySelector('#brx-sub-conv-row span:last-child');if($l)$l.textContent=cl;
+    // 更新 checkmark
+    p.querySelectorAll('.brx-sub-item[data-conv]').forEach(el=>{el.classList.toggle('current',el.dataset.conv===this.convMode);});
+  }
+  _updateColorDots(){
+    const p=this._ui?.panel;if(!p)return;
+    p.querySelectorAll('.brx-sub-color-dot').forEach(el=>{el.classList.toggle('active',el.dataset.color===this.style.color);});
+  }
   _updateSliderSpan(id,text){const el=document.getElementById(id);if(el)el.textContent=text;}
 }
 
