@@ -322,9 +322,14 @@ async function ensureVendorLoaded() {
 // ArtPlayer 内部子控件仍能正常处理事件。
 function installPlayerEventFence(root) {
   const cleanups = [];
+  // 注意：不要拦截 pointerup/mouseup/touchend。
+  // ArtPlayer / artplayer-plugin-danmuku 的滑块拖拽通过 document:pointerup
+  // 结束拖拽；如果 release 事件在 root 冒泡阶段被截断，弹幕面板的滑块
+  // 会一直保持 dragging 状态，表现为鼠标“粘着小球放不下来”。
+  // click/dblclick 仍会被截断，所以 release 透传到 document 不会触发 B 站原生点击逻辑。
   const events = [
     'click', 'dblclick', 'contextmenu',
-    'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend',
+    'mousedown', 'pointerdown', 'touchstart',
     'wheel', 'keydown', 'keyup',
   ];
   for (const eventName of events) {
