@@ -32,6 +32,30 @@ v0.3-artplayer-migration 分支，HEAD：
 - 根因：插件向 `https://api.bilibili.com/x/v2/dm/web/view` 发起的请求中
   `oid=null`、`pid=null`、`duration=0`（注意是字符串 "null"），
   B 站返回 `{"code":-400,"message":"请求错误"}`。
+- **修复**：18abf90 改用 `/pgc/season/episode/web/info` + 非破坏性合并，cid/aid/duration 正确传入。
+
+## 2026-06-05 评论不加载 bug 修复
+
+**现象**：ep713699 受限页，弹幕修好后 ArtPlayer 正常播放，但 `#comment-module` 内 `<bili-comments>` 始终只显示 spinner，0 条评论。
+
+**根因**：受限页 B 站 React 会把 `#comment-module` 设为 `display:none`（因播放器 PLAY_NONE 状态）。
+`<bili-comments lazy-load="true">` 用 IntersectionObserver 触发 lazy-load，
+隐藏元素无尺寸，Observer 永远不 fire → 评论 API 从未调用。
+
+**修复**（ba7f732）：
+- `src/common/dom.mjs` 新增 `unhideCommentModule()`：把 `#comment-module` 改为 `display:block`，
+  移除 `aria-hidden`；加 MutationObserver 防止 React 后续 re-render 又设回 `display:none`。
+- `src/content/app.mjs` 在 `mountPlayer` 之后调用一次。
+
+**实测**（ep713699，滚动到评论区后）：
+- `cmStyle: "display: block; visibility: visible;"`
+- `threadCount: 20`
+- 首条：rpid=145970386352, 作者=魔哀, 内容="这一季的内容大可以放心..."，394 赞
+
+**注意事项**：
+- 只 unhide 不会立刻加载评论，lazy-load 仍需 IntersectionObserver 触发。
+  用户**滚动到评论区**时才会真正拉取（与正常页行为一致）。
+- 验证脚本：`bc.scrollIntoView({behavior:'instant', block:'center'})` → 等 4s → `sr.querySelectorAll('bili-comment-thread-renderer').length`。
 - 推断：插件在 PGC 场景下没有正确读取分集 `cid`，
   `String(null)` 被直接拼到 URL，**没有空值校验**。
 - 影响范围：仅 PGC 番剧（`type=1`），UGC 视频可能正常（待回归）。
