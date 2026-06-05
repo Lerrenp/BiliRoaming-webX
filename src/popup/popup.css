@@ -1,1 +1,242 @@
-body{margin:0;width:360px;background:#18191c;color:#f1f2f3;font:14px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{padding:12px}h1{font-size:16px;margin:0 0 10px;color:#fff}h2{font-size:13px;margin:12px 0 6px;color:#00aeec}section{border-top:1px solid #303238;padding-top:8px;margin-top:8px}label{display:block;margin:8px 0}.row{display:flex;align-items:center;gap:6px}input:not([type=checkbox]):not([type=range]),select,textarea{box-sizing:border-box;width:100%;margin-top:4px;background:#2b2d31;color:#fff;border:1px solid #555;border-radius:5px;padding:6px}input[type=range]{width:220px;vertical-align:middle}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{width:100%;margin:6px 0;padding:8px;border:0;border-radius:6px;background:#00aeec;color:#fff;cursor:pointer;font-weight:600}button.secondary{background:#3a3d44}#status{min-height:18px;color:#9fe;line-height:1.4}#opacityText{display:inline-block;min-width:42px;text-align:right;color:#9fe}
+/* BiliRoaming-X Player 弹窗样式 - 跟随系统暗色亮色 */
+
+:root {
+  --bg: #ffffff;
+  --bg-elev: #f6f7f9;
+  --bg-input: #ffffff;
+  --fg: #1d2129;
+  --fg-muted: #86909c;
+  --primary: #00aeec;
+  --primary-hover: #0098d3;
+  --primary-fg: #ffffff;
+  --secondary-bg: #f2f3f5;
+  --secondary-hover: #e5e6eb;
+  --border: #e5e6eb;
+  --border-input: #c9cdd4;
+  --status: #00b42a;
+  --error: #f53f3f;
+  --radius: 8px;
+  --radius-sm: 5px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #18191c;
+    --bg-elev: #1f2125;
+    --bg-input: #2b2d31;
+    --fg: #f1f2f3;
+    --fg-muted: #a7a9ad;
+    --secondary-bg: #2f3135;
+    --secondary-hover: #3a3d44;
+    --border: #2f3135;
+    --border-input: #4a4d54;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  width: 360px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+main { padding: 16px; }
+
+/* 标题带个蓝色色块标识 */
+h1 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 14px;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+h1::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background: var(--primary);
+  border-radius: 3px;
+}
+
+h2 {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 14px 0 8px;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+section {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+/* 字段：上下结构 label + 控件 */
+.field {
+  display: block;
+  margin: 10px 0;
+  color: var(--fg);
+  font-size: 13px;
+}
+.field-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 开关行：checkbox 隐藏原生外观，做成 iOS 风开关 */
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.switch-row .switch {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  background: var(--border-input);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.switch-row .switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .15);
+  transition: left .18s;
+}
+.switch-row .switch:checked {
+  background: var(--primary);
+}
+.switch-row .switch:checked::after {
+  left: 18px;
+}
+.switch-label {
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.grid2 .field { margin: 10px 0; }
+
+input:not([type=checkbox]):not([type=range]),
+select,
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  background: var(--bg-input);
+  color: var(--fg);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(0, 174, 236, .15);
+}
+textarea {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  resize: vertical;
+  min-height: 48px;
+  line-height: 1.4;
+}
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2386909c' d='M2 4l4 4 4-4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 26px;
+}
+@media (prefers-color-scheme: dark) {
+  select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%23a7a9ad' d='M2 4l4 4 4-4z'/></svg>");
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+.actions button { flex: 1; }
+
+button {
+  width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: var(--primary-fg);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  transition: background .12s, transform .08s;
+}
+button:hover { background: var(--primary-hover); }
+button:active { transform: scale(.98); }
+
+button.secondary {
+  background: var(--secondary-bg);
+  color: var(--fg);
+}
+button.secondary:hover { background: var(--secondary-hover); }
+
+button.ghost {
+  background: transparent;
+  color: var(--primary);
+  border: 1px dashed var(--border-input);
+  margin-top: 6px;
+  font-weight: 500;
+}
+button.ghost:hover {
+  border-style: solid;
+  background: rgba(0, 174, 236, .08);
+}
+
+#status {
+  min-height: 18px;
+  margin: 10px 0 0;
+  padding: 0 2px;
+  color: var(--status);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+#status.error { color: var(--error); }
