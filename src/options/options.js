@@ -33,39 +33,11 @@ async function save() {
   setStatus('已保存。下次加载/切集时生效');
 }
 
-async function readKey() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  let ak = null;
-  if (tab?.id && tab.url && /^https?:\/\/(www\.)?bilibili\.com\//.test(tab.url)) {
-    const resp = await chrome.tabs.sendMessage(tab.id, { type: 'BRX_PLAYER_READ_ACCESS_KEY' }).catch(() => null);
-    ak = resp?.accessKey || null;
-  }
-  if (!ak && tab?.id && tab.url && /^https?:\/\/(www\.)?bilibili\.com\//.test(tab.url)) {
-    try {
-      const [{ result }] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => localStorage.getItem('access_key') || localStorage.getItem('accessKey') || localStorage.access_key || '',
-      });
-      ak = result || null;
-    } catch (_) {}
-  }
-  if (ak) {
-    $('accessKey').value = ak;
-    $('clientMode').value = 'app';
-    setStatus('已读取 access_key，请保存');
-  } else {
-    setStatus('当前页没有 access_key（请先在 B 站登录）', true);
-  }
-}
-
 async function reloadActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id) await chrome.tabs.reload(tab.id);
-  window.close();
 }
 
-
 $('save').addEventListener('click', save);
-$('readKey').addEventListener('click', readKey);
 $('reload').addEventListener('click', reloadActiveTab);
-load();
+load().catch((err) => setStatus(String(err?.message || err), true));

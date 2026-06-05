@@ -39,6 +39,12 @@
         </label>
       </div>
 
+      <label class="row switch-row" title="关闭后 Web 模式不会发送 x-from-biliroaming / platform-from-biliroaming 等漫游请求头，用于兼容旧 PHP 后端 code=-15。">
+        <input id="webRoamingHeaders" type="checkbox" class="switch">
+        <span class="switch-label">Web 模式发送漫游请求头</span>
+      </label>
+      <p class="hint">旧 PHP 后端报 code=-15 / 错误请求头时，请关闭此项。</p>
+
       <label class="field">
         <span class="field-label">Access Key</span>
         <textarea id="accessKey" rows="3" placeholder="App 模式可填写 access_key"></textarea>

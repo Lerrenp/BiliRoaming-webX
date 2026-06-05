@@ -77,6 +77,16 @@ export class SubtitleManager {
     if(!$player)return;
     $player.appendChild(panel);
 
+    // 面板挂在 ArtPlayer 的 player 容器里，点击面板内部控件时不能继续冒泡到
+    // ArtPlayer/原页面的控制层。否则字幕开关点击会被外层误判成播放器控制点击，
+    // 在部分页面上表现为误触发网页全屏（再点一次又恢复）。
+    for (const eventName of ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend']) {
+      panel.addEventListener(eventName, (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      });
+    }
+
     this.art.controls.add({
       name:'subtitle',position:'right',index:5,
       html:'<span>'+ICON_CC+'</span>',

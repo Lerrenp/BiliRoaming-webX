@@ -25,6 +25,11 @@ export async function mountPlayer({ playurl, context, config, log }) {
   root.appendChild(style);
   outer.appendChild(root);
 
+  // 播放器覆盖层事件栅栏：允许 ArtPlayer 内部控件先正常处理事件，
+  // 但在冒泡离开覆盖层前截断，避免点击/双击/右键等漏到 B 站原生播放器，
+  // 触发原生网页全屏、暂停、选中控件等副作用。
+  const eventFenceCleanups = installPlayerEventFence(root);
+
   for (const v of outer.querySelectorAll('video')) {
     if (!v.closest('.brx-player-root')) v.style.opacity = '0';
   }
@@ -271,6 +276,9 @@ export async function mountPlayer({ playurl, context, config, log }) {
       if (dmSaveTimer) { clearInterval(dmSaveTimer); dmSaveTimer = null; }
       try { subtitleManager?.dispose?.(); } catch (_) {}
       subtitleManager = null;
+      for (const cleanup of eventFenceCleanups) {
+        try { cleanup(); } catch (_) {}
+      }
       document.removeEventListener('fullscreenchange', onGlobalFullscreenChange);
       try { resizeObserver?.disconnect?.(); } catch (_) {}
       try { dashPlayer?.reset?.(); } catch (_) {}
@@ -284,6 +292,27 @@ export async function mountPlayer({ playurl, context, config, log }) {
 async function ensureVendorLoaded() {
   if (!window.Artplayer) throw new Error('ArtPlayer vendor not loaded');
   if (!window.dashjs) throw new Error('dash.js content script not loaded');
+}
+
+function installPlayerEventFence(root) {
+  const cleanups = [];
+  const events = [
+    'click', 'dblclick', 'contextmenu',
+    'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend',
+    'wheel', 'keydown', 'keyup',
+  ];
+  for (const eventName of events) {
+    const handler = (e) => {
+      // capture 阶段不拦，让 ArtPlayer 子控件仍能收到事件；bubble 阶段截断，
+      // 防止事件继续冒泡到 #bilibili-player / B 站原生播放器监听器。
+      if (e.eventPhase !== Event.BUBBLING_PHASE) return;
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    };
+    root.addEventListener(eventName, handler, false);
+    cleanups.push(() => root.removeEventListener(eventName, handler, false));
+  }
+  return cleanups;
 }
 
 function cssText() {

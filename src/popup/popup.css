@@ -230,6 +230,13 @@ button.ghost:hover {
   background: rgba(0, 174, 236, .08);
 }
 
+.hint {
+  margin: -6px 0 8px 46px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 #status {
   min-height: 18px;
   margin: 10px 0 0;

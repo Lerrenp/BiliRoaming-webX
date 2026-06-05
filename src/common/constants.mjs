@@ -10,6 +10,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   serverBaseUrl: 'https://bili.xcnya.cn',
   area: 'hk',
   clientMode: 'web',
+  webRoamingHeaders: true,
   accessKey: '',
   defaultQn: '80',
   defaultCodec: 'auto',

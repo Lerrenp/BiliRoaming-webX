@@ -12,13 +12,15 @@ export async function fetchPlayurlWeb(context, cfg) {
   if (cfg.accessKey) params.set('access_key', cfg.accessKey);
   const base = String(cfg.serverBaseUrl || '').replace(/\/+$/, '');
   const url = base + '/pgc/player/web/playurl?' + params.toString();
-  const resp = await fetch(url, {
-    headers: {
+  const init = {};
+  if (cfg.webRoamingHeaders !== false) {
+    init.headers = {
       'User-Agent': 'Bilibili Freedoooooom/MarkII',
       'x-from-biliroaming': 'biliroaming-x-player',
       'platform-from-biliroaming': 'web',
-    },
-  });
+    };
+  }
+  const resp = await fetch(url, init);
   const json = await resp.json();
   if (json && json.code === 0) return json;
   throw new Error('BiliRoaming playurl failed: ' + JSON.stringify(json).slice(0, 500));
