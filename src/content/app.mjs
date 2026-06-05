@@ -35,7 +35,19 @@ async function handleStart(payload, reason) {
   const cfg = await sendRuntime('GET_CONFIG', {});
   if (!cfg.enabled) return;
 
-  let context = { ...(payload.context || {}) };
+  // 防御：仅在"港澳台限定"番剧上激活。内地番剧（国创）不应被处理。
+  // 双重检查：MAIN world 已经在 isGmtOnly() 拦过，但这里再确认一次避免误伤。
+  // 注意：ISOLATED world 看不到 window.__playinfo__，所以用 MAIN 传来的 context.limited + 标题正则。
+  const context0 = payload.context || {};
+  const title = context0.title || document.title || '';
+  const isGmt = /僅限港澳台地區|仅限港澳台地区/.test(title);
+  const isLimited = !!context0.limited;
+  if (!isGmt || !isLimited) {
+    log.info('skip non-GMT page', { title, isGmt, isLimited, reason });
+    return;
+  }
+
+  let context = { ...context0 };
   if (context.epId) {
     try {
       const patch = await sendRuntime('FETCH_EP_INFO', { epId: context.epId });

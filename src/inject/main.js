@@ -15,6 +15,12 @@
     if(Array.isArray(pi.plugins) && pi.plugins.some(p=>/AreaLimitPanel/i.test(p?.name||''))) return true;
     return false;
   }
+  // 仅在"港澳台限定"番剧上激活。B 站内地番剧（国创）标题里没有"僅限港澳台地區"字样。
+  // play_video_type/play_check 在内地页是 "whole" / "PLAY_WHOLE"，但旧数据或 hydration 阶段
+  // 可能误为"none"或"PLAY_NONE"，因此以**标题 + 区域限制**双重判断最稳。
+  function isGmtOnly(){
+    return isAreaLimited() && /僅限港澳台地區|仅限港澳台地区/.test(document.title||'');
+  }
   // 从 __playinfo__ 提取当前正在尝试播放的集数信息。
   // SS 页 (play/ss*) 没有 ep_id 但 play_view_business_info.episode_info / supplement.ogv_episode_info
   // 含"上次播放/默认首集"的 ep_id。没有这个 epId，BiliRoaming 服务端无法解析 playurl（-412）。
@@ -37,7 +43,7 @@
     return { epId, seasonId, aid, cid, bvid, title:document.title||'', href:location.href, limited:isAreaLimited(pi) };
   }
   function notify(type,payload={}){ window.postMessage({source:SOURCE,type,payload:Object.assign({context:deriveContext(payload.context||{})},payload)},'*'); }
-  function maybeStart(reason){ const context=deriveContext(); window.__BRX_PLAYER_CONTEXT__=context; if(context.limited||context.epId||context.cid) notify('BRX_PLAYER_START',{reason,context}); }
+  function maybeStart(reason){ const context=deriveContext(); window.__BRX_PLAYER_CONTEXT__=context; if(isGmtOnly()) notify('BRX_PLAYER_START',{reason,context}); }
   try { const desc=Object.getOwnPropertyDescriptor(window,'__playinfo__'); if(!desc||desc.configurable){ Object.defineProperty(window,'__playinfo__',{configurable:true,enumerable:true,get(){return playinfoValue},set(v){playinfoValue=v;setTimeout(()=>maybeStart('__playinfo__ setter'),0)}}); } } catch(_) {}
   document.addEventListener('click',(event)=>{ const link=event.target?.closest?.('a[href*="/bangumi/play/ep"]'); if(!link) return; const m=(link.getAttribute('href')||'').match(/ep(\d+)/); if(!m) return; event.preventDefault(); event.stopPropagation(); history.pushState({},'',new URL(link.getAttribute('href'),location.href).href); notify('BRX_PLAYER_EPISODE_SELECT',{context:{epId:Number(m[1])},href:link.href}); },true);
   const oldPush=history.pushState; history.pushState=function(...args){const r=oldPush.apply(this,args);setTimeout(()=>maybeStart('pushState'),80);return r;};
