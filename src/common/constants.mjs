@@ -21,7 +21,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   webRoamingHeaders: true,
   accessKey: '',
   defaultQn: '80',
-  defaultCodec: 'auto',
+  defaultCodec: 'hevc',
   defaultAudioId: 'auto',
   danmakuEnabled: true,
   danmakuOpacity: 0.95,
