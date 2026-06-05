@@ -190,32 +190,34 @@ export class SubtitleManager {
   buildUI() {
     if (this._uiBuilt || !this.art?.template) return;
     ensureStyle();
-    const $center = this.art.template.$controlsCenter;
-    if (!$center) return;
-    $center.style.display = 'flex';
-    $center.style.alignItems = 'center';
-    $center.style.justifyContent = 'center';
-    $center.style.gap = '4px';
-    $center.style.position = 'relative';
+    const $right = this.art.template.$controlsRight;
+    if (!$right) return;
 
+    // toggle 按钮塞进 controlsRight 最后面
     const toggle = document.createElement('div');
     toggle.className = 'brx-subtitle-toggle';
     toggle.title = '字幕';
     toggle.innerHTML = ICON_CC;
-    $center.appendChild(toggle);
+    $right.appendChild(toggle);
 
+    // 弹出面板挂到播放器容器上（绝对定位），防止被 controls 的 flex 挤压
     const panel = document.createElement('div');
     panel.className = 'brx-subtitle-panel';
-    $center.appendChild(panel);
+    this.art.template.$player.appendChild(panel);
 
     toggle.addEventListener('click', (e) => {
       e.stopPropagation();
+      // 面板定位在 toggle 正上方
+      const tr = toggle.getBoundingClientRect();
+      const pr = this.art.template.$player.getBoundingClientRect();
+      panel.style.left = (tr.left + tr.width / 2 - pr.left - 90) + 'px';
+      panel.style.bottom = (pr.bottom - tr.top + 8) + 'px';
       panel.classList.toggle('open');
     });
     document.addEventListener('click', () => panel.classList.remove('open'), { capture: true });
     panel.addEventListener('click', (e) => e.stopPropagation());
 
-    this._ui = { root: $center, toggle, panel };
+    this._ui = { toggle, panel };
     this._uiBuilt = true;
     this._refreshUI();
   }

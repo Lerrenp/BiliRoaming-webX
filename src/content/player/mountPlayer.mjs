@@ -109,7 +109,6 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   art.on('ready', async () => {
     installResizeRelay();
-    relocateDanmukuControls();
     buildSubtitleControl();
     await loadSubtitle();
     window.__BRX_PLAYER_DEBUG__ = Object.assign(window.__BRX_PLAYER_DEBUG__ || {}, { art, dashPlayer });
@@ -186,37 +185,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
     return plugins;
   }
 
-  // 把弹幕插件的 toggle / config / style 从 controlsCenter 移到 controlsLeft，
-  // 紧贴 time 右边。emitter（输入框）已被 config 禁用所以是空的，不动。
-  function relocateDanmukuControls() {
-    if (!art?.template) return;
-    const $center = art.template.$controlsCenter;
-    const $left = art.template.$controlsLeft;
-    const $time = art.template.$time;
-    if (!$center || !$left) return;
-    const attempt = () => {
-      const $container = $center.querySelector('.artplayer-plugin-danmuku');
-      if (!$container) return false;
-      const selectors = ['.apd-toggle', '.apd-config', '.apd-emitter'];
-      const elements = selectors.map((s) => $container.querySelector(s)).filter(Boolean);
-      if (!elements.length) return false;
-      const $after = $time ? $time.nextSibling : null;
-      for (const $el of elements) {
-        if ($after) $left.insertBefore($el, $after);
-        else $left.appendChild($el);
-      }
-      if ($container.parentNode && !$container.children.length) {
-        $container.parentNode.removeChild($container);
-      }
-      return true;
-    };
-    if (!attempt()) {
-      setTimeout(() => { if (!attempt()) setTimeout(() => attempt(), 500); }, 200);
-    }
-  }
-
-  // 在中间 controlsCenter 增加字幕开关 + 弹出语言切换面板
-  // （弹幕插件原位置，弹幕插件自带的 toggle 我们用 CSS 隐藏）
+  // 字幕开关 + 语言切换面板，挂在 controlsRight（右边设置按钮旁边）
   function buildSubtitleControl() {
     if (!art?.template) return;
     subtitleManager = new SubtitleManager({ art, log });
