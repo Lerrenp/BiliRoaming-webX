@@ -67,6 +67,7 @@
         "src/content/player/mountPlayer.mjs",
         "src/content/subtitle/biliSubtitle.mjs",
         "src/content/subtitle/subtitlePlugin.mjs",
+        "vendor/zhConvert.mjs",
         "src/common/constants.mjs",
         "src/common/logger.mjs",
         "src/common/dom.mjs",
