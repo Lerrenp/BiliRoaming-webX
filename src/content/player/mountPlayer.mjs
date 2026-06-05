@@ -50,7 +50,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   // 从 chrome.storage 加载弹幕已保存设置
   let dmSaved = {};
-  try { const r = await chrome.storage.sync.get('brx_danmaku'); if (r.brx_danmaku) dmSaved = r.brx_danmaku; } catch (_) {}
+  try { const r = await chrome.storage.sync.get('brx_danmaku'); if (r.brx_danmaku) { dmSaved = r.brx_danmaku; delete dmSaved.margin; } } catch (_) {}
 
   function nextMpdUrl() {
     if (mpdObjectUrl) URL.revokeObjectURL(mpdObjectUrl);
@@ -178,7 +178,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
       }
       const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
       // 从 chrome.storage 加载已保存的弹幕设置
-      const dmDefaults = { speed:5, opacity:0.9, fontSize:25, margin:25, antiOverlap:true, synchronousPlayback:true, visible:true, modes:[0,1,2] };
+      const dmDefaults = { speed:5, opacity:0.9, fontSize:25, antiOverlap:true, synchronousPlayback:true, visible:true, modes:[0,1,2] };
       const dmOpts = { ...dmDefaults, ...dmSaved, danmuku: danmukuUrl, emitter: false, heatmap: false, filter: (d) => d.text.trim().length > 0 };
       plugins.push(window.artplayerPluginDanmuku(dmOpts));
     }
@@ -236,7 +236,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
         });
         return modes.length ? modes : [0, 1, 2];
       };
-      // 先读当前值，再合并（visible 由事件独立管理）
+      // 先读当前值，再合并（visible 由事件独立管理，margin 不持久化）
       chrome.storage.sync.get('brx_danmaku', (prev) => {
         const p = prev?.brx_danmaku || {};
         chrome.storage.sync.set({ brx_danmaku: {
@@ -244,7 +244,6 @@ export async function mountPlayer({ playurl, context, config, log }) {
           speed: readVal('.apd-config-speed') || 5,
           opacity: readVal('.apd-config-opacity') || 0.9,
           fontSize: readVal('.apd-config-fontSize') || 25,
-          margin: readVal('.apd-config-margin') || 25,
           antiOverlap: readBool('.apd-anti-overlap'),
           synchronousPlayback: readBool('.apd-sync-video'),
           modes: readModes(),
