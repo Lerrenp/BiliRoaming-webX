@@ -28,9 +28,12 @@
     - [使用](#使用)
   - [配置项说明](#配置项说明)
     - [⚠️ 关于 App 模式（暂时不可用）](#️-关于-app-模式暂时不可用)
-  - [🔑 access_key 获取教程](#-access_key-获取教程)
+  - [🔑 access\_key 获取教程](#-access_key-获取教程)
     - [安装步骤](#安装步骤)
     - [使用步骤（2 种方式任选）](#使用步骤2-种方式任选)
+      - [方式 1：手动输入](#方式-1手动输入)
+      - [方式 2：二维码自动获取（推荐）](#方式-2二维码自动获取推荐)
+    - [写入 popup](#写入-popup)
   - [开发说明](#开发说明)
     - [模块划分原则](#模块划分原则)
     - [调试变量](#调试变量)
@@ -183,7 +186,7 @@ playwright-cli open https://www.bilibili.com/bangumi/play/ss44467/ --headed --pe
 | **模式** | `web` / `app` | ⚠️ App 模式因 SSL 403 暂时不可用，请用 web 模式 |
 | **区域** | `hk` / `tw` / `th` / `cn` | 不同服务端支持不同的地区组合 |
 | **Web 模式发送漫游请求头** | 开关 | 旧 PHP 后端报 `code=-15` 时关掉 |
-| **Access Key** | App 模式签名用（当前 web 模式可忽略） | 留空走 web 模式；可点按钮从 B 站 localStorage 自动读取 |
+| **Access Key** | web 模式签名用 | 留空走 旧php web 模式；可点按钮从 B 站 localStorage 自动读取 |
 | **清晰度 / 编码 / 音轨** | 默认值 | 播放时可临时切换 |
 
 > 💡 access_key 不会上传到任何第三方服务，全部存在本地 `chrome.storage.sync`。
@@ -202,11 +205,11 @@ playwright-cli open https://www.bilibili.com/bangumi/play/ss44467/ --headed --pe
 **目前的推荐做法：**
 
 - **保持 `web` 模式** —— 大多数公共 BiliRoaming 服务端
-  （`bili.xcnya.cn` / 自建）都直接支持 web 通道，无需 access_key 也能拿流。
-- access_key 暂时是**冗余配置**，popup 里的"Access Key"输入框可以**留空**。
-- 等服务端 SSL 修好或切到新代理后，App 模式会自动恢复（无需改代码）。
+  （`bili.xcnya.cn` / 自建）都直接支持 web 通道，access_key 就能拿流。
+- access_key popup 里的"Access Key"输入框可以**留空**（仅限部分php后端）。
+- 等服务端 SSL 伪装有人做或切到开发出tun签名重写后，App 模式会恢复（无需改代码）。
 
-**用户侧无需操作**；如果你自己部署 BiliRoaming 服务端遇到 403，
+**用户侧无需操作**；如果你自己部署 BiliRoaming 服务端遇到 403（web模式几乎不可能），
 可以检查 `nginx` 证书链 + 上游 B 站 `api.bilibili.com` 的 TLS 版本
 （多数是 1.0/1.1 协商失败）。
 
@@ -214,8 +217,8 @@ playwright-cli open https://www.bilibili.com/bangumi/play/ss44467/ --headed --pe
 
 ## 🔑 access_key 获取教程
 
-虽然 App 模式暂不可用，但**未来 SSL 修好后**还需要 access_key。
-本仓库附带一个独立油猴脚本，让你**不需要登录 B 站主站**就能拿到 access_key：
+虽然 App 模式暂不可用，web模式需要 access_key。
+本仓库附带一个独立油猴脚本，让你**登录 B 站主站**就能拿到 access_key：
 
 📄 [`userscripts/balh_access_key_helper.user.js`](./userscripts/balh_access_key_helper.user.js)
 v3.2.0 · MIT License · 基于 [ipcjs/bilibili-helper](https://github.com/ipcjs/bilibili-helper) 改造
@@ -239,8 +242,8 @@ v3.2.0 · MIT License · 基于 [ipcjs/bilibili-helper](https://github.com/ipcjs
 
 1. 点击弹窗里的"自动获取 access_key"按钮
 2. 脚本会调 B 站 TV 登录接口，拿到一个 `auth_code`
-3. 用 B 站**手机 App** 扫描浮层里显示的二维码
-4. App 上确认后，access_key 自动写入 `localStorage.access_key`
+3. 用 B 站**手机 App** 扫描浮层里显示的二维码（绝大多数可以直接借由主站登录状态直接拿到）
+4. App 上确认后，access_key 自动写入 `localStorage.access_key`（兼容老脚本）
 
 ### 写入 popup
 
@@ -251,7 +254,7 @@ v3.2.0 · MIT License · 基于 [ipcjs/bilibili-helper](https://github.com/ipcjs
 3. 点 "保存配置" 即可
 
 > 💡 access_key 与 B 站账号绑定，**不绑定 session**；
-> 一次获取，过期前（默认 1 年）可重复使用。
+> 一次获取，过期前可重复使用。
 
 ---
 
@@ -390,6 +393,7 @@ VisionPlayer 自己写 video 状态机，"暂停后音频继续" 的 bug 调了�
 - [ArtPlayer](https://github.com/zhw2590582/ArtPlayer) —— 播放器 UI 与状态机
 - [dash.js](https://github.com/Dash-Industry-Forum/dash.js) —— DASH MSE 引擎
 - 所有早期油猴脚本作者和 BiliRoaming 生态贡献者
+- [解除B站区域限制 (Greasy Fork #25718)](https://greasyfork.org/zh-CN/scripts/25718-%E8%A7%A3%E9%99%A4b%E7%AB%99%E5%8C%BA%E5%9F%9F%E9%99%90%E5%88%B6) —— 浏览器端区域限制解锁油猴脚本，本扩展的思路与协议层参照
 
 如果这个项目对你有帮助，欢迎给个 ⭐。
 如果发现 bug 或有想法，欢迎开 issue / PR。
