@@ -157,6 +157,17 @@ export class SubtitleManager {
 
   _apply() {
     if (!this.art?.subtitle?.init) return;
+    // ArtPlayer 的 subtitle 系统依赖一个已有的 <track> 元素来给 textTrack 赋值。
+    // 如果构造函数里没设 subtitle.url，就不会创建 track，后续 init() 会直接 return null。
+    // 先插入一个最小空 VTT 的 track，再 init 走正常流程就会替换掉它。
+    if (!this.art.subtitle.textTrack) {
+      const dummyUrl = URL.createObjectURL(new Blob(['WEBVTT\n\n'], { type: 'text/vtt' }));
+      try {
+        this.art.subtitle.createTrack('metadata', dummyUrl);
+      } catch (_) {
+        // createTrack 可能也在内部检查了条件，静默
+      }
+    }
     const track = this.currentIndex >= 0 ? this.tracks[this.currentIndex] : null;
     if (track) {
       this.art.subtitle.init({
@@ -168,9 +179,8 @@ export class SubtitleManager {
     } else {
       try {
         const tt = this.art.template?.$video?.textTracks?.[0];
-        if (tt) tt.mode = 'disabled';
+        if (tt) { tt.mode = 'disabled'; }
       } catch (_) {}
-      this.art.subtitle.init({ url: '', type: 'vtt', escape: false });
     }
   }
 
