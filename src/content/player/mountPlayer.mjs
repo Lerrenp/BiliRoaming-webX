@@ -1,3 +1,24 @@
+// BiliRoaming-X Player — 播放器挂载核心。
+//
+// 架构：覆盖式播放（不重写 B 站 Player core）
+//   在 #bilibili-player 内追加 .brx-player-root 绝对定位覆盖层，隐藏 B 站原生 <video>，
+//   创建 ArtPlayer 接管 video 状态机，dash.js 作为 MSE 引擎消费 MPD Blob。
+//
+// 关键设计点：
+//   - 选择器等待：waitForElement('#bilibili-player, .bpx-player-container') —— 容器可能被
+//     React 异步渲染。
+//   - 事件栅栏 installPlayerEventFence：bubble 阶段截断 click/dblclick/contextmenu/mouse/
+//     pointer/touch/wheel/keydown/keyup，避免 ArtPlayer 内部控件点击冒泡到 B 站原生监听器
+//     触发误触（网页全屏 / 暂停 / 选中控件）。
+//   - destroy 顺序：clearInterval → subtitle dispose → eventFence cleanup → resizeObserver
+//     disconnect → dashPlayer.reset → art.destroy(false) → revokeObjectURL → root.remove，
+//     保证切集后无残留音频（修复历史：VisionPlayer 时代 "暂停后音频继续"）。
+//   - 切换清晰度/编码/音轨：reloadWithSelection() 重建 MPD Blob，保留 currentTime。
+//
+// 弹幕：artplayerPluginDanmuku(cid-based https://comment.bilibili.com/<cid>.xml) +
+//   chrome.storage.sync.brx_danmaku 持久化。
+// 字幕：SubtitleManager 异步拉 /x/v2/subtitle/web/view → VTT Blob → art.subtitle.init。
+
 import { waitForElement, stripAreaLimitUi } from '../../common/dom.mjs';
 import { extractDash, uniqueQualities, uniqueCodecs, audioOptions, createMpdUrl, selectStreams } from './dashMpdBuilder.mjs';
 import { SubtitleManager } from '../subtitle/subtitlePlugin.mjs';
@@ -74,6 +95,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
     return mpdObjectUrl;
   }
 
+  // ArtPlayer customType 回调：dash.js 接管 <video>。
   function playMpd(video, url, artInstance) {
     if (!window.dashjs?.supportsMediaSource?.()) {
       artInstance.notice.show = '当前浏览器不支持 DASH/MSE';
@@ -181,17 +203,15 @@ export async function mountPlayer({ playurl, context, config, log }) {
     ];
   }
 
-  let dmInstance = null; // danmuku 插件实例引用，用于持久化
-
   function createArtPlugins() {
     const plugins = [];
     if (window.artplayerPluginDanmuku) {
+      // PGC 场景下 cid 不可缺（缺失会让插件请求 ?oid=null&pid=null → code:-400）。
+      // 由 content/app.mjs 的 FETCH_EP_INFO 已确保 cid 非空。
       const cid = Number(context?.cid) || 0;
-      if (!cid) {
-        log.warn('danmuku: skip load, context.cid missing', { context });
-      }
+      if (!cid) log.warn('danmuku: skip load, context.cid missing', { context });
       const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
-      const dmDefaults = { speed:5, opacity:0.9, fontSize:25, antiOverlap:true, synchronousPlayback:true, visible:true, modes:[0,1,2] };
+      const dmDefaults = { speed: 5, opacity: 0.9, fontSize: 25, antiOverlap: true, synchronousPlayback: true, visible: true, modes: [0, 1, 2] };
       const dmOpts = { ...dmDefaults, ...dmSaved, danmuku: danmukuUrl, emitter: false, heatmap: false, filter: (d) => d.text.trim().length > 0 };
       plugins.push(window.artplayerPluginDanmuku(dmOpts));
     }
@@ -230,7 +250,8 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   let dmSaveTimer = null;
   function installDanmakuPersistence() {
-    // ArtPlayer 插件挂在 art.plugins 上，属性名是 plugin 返回值的 name
+    // ArtPlayer 插件挂在 art.plugins 上，属性名是 plugin 返回值的 name。
+    // 实际值：art.plugins.artplayerPluginDanmuku 或 art.plugins.danmuku（向后兼容）。
     const readOpt = () => {
       try {
         const p = art.plugins || {};
@@ -248,8 +269,8 @@ export async function mountPlayer({ playurl, context, config, log }) {
           fontSize: opt.fontSize,
           antiOverlap: opt.antiOverlap,
           synchronousPlayback: opt.synchronousPlayback,
-          modes: Array.isArray(opt.modes) ? [...opt.modes] : [0,1,2],
-        }});
+          modes: Array.isArray(opt.modes) ? [...opt.modes] : [0, 1, 2],
+        } });
       } catch (_) {}
     };
     save();
@@ -290,10 +311,15 @@ export async function mountPlayer({ playurl, context, config, log }) {
 }
 
 async function ensureVendorLoaded() {
+  // ISOLATED content_scripts 列表里已经预先注入了 vendor/dash.all.min.js + artplayer.js，
+  // 这里只做存在性检查，不再二次加载。
   if (!window.Artplayer) throw new Error('ArtPlayer vendor not loaded');
   if (!window.dashjs) throw new Error('dash.js content script not loaded');
 }
 
+// 事件栅栏：在 .brx-player-root 上注册 bubble 阶段 stopPropagation，阻止
+// 控件点击冒泡到 #bilibili-player / B 站原生播放器监听器。capture 阶段不拦截，
+// ArtPlayer 内部子控件仍能正常处理事件。
 function installPlayerEventFence(root) {
   const cleanups = [];
   const events = [
@@ -303,8 +329,6 @@ function installPlayerEventFence(root) {
   ];
   for (const eventName of events) {
     const handler = (e) => {
-      // capture 阶段不拦，让 ArtPlayer 子控件仍能收到事件；bubble 阶段截断，
-      // 防止事件继续冒泡到 #bilibili-player / B 站原生播放器监听器。
       if (e.eventPhase !== Event.BUBBLING_PHASE) return;
       e.stopPropagation();
       e.stopImmediatePropagation();

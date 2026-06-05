@@ -1,4 +1,20 @@
-// 字幕管理器：多轨字幕加载、中文繁简转换、字幕样式设置
+// 字幕管理器：多轨字幕加载、中文繁简转换、字幕样式设置。
+//
+// 面板结构：
+//   .brx-subtitle-panel（挂在 art.template.$player 内，点击外部关闭）
+//   ├── 主开关 brx-sub-main-toggle
+//   ├── 字幕轨列表 brx-sub-item[data-idx]
+//   ├── 繁简转换 brx-sub-conv-row / brx-sub-item[data-conv]
+//   └── 设置 brx-sub-settings-btn（字号/颜色/位置）
+//
+// 关键设计点：
+//   - 面板内部 click/mousedown/pointerdown/.../touchend 全部 stopPropagation，
+//     否则字幕开关点击会被外层误判成"播放器控制点击"，在部分页面触发网页全屏。
+//   - 面板挂到 art.template.$player，点击 player 空白区域时关闭面板。
+//   - 字幕数据异步加载：buildUI() 同步挂按钮，load() 异步拉 protobuf → VTT。
+//   - 繁简转换：preload zhConvert.mjs（vendor），apply 时同步替换（非异步，避免弹幕式卡顿）。
+//
+// 持久化：chrome.storage.sync.brx_subtitle（fontSize/color/bottom/convMode）。
 import { fetchBiliSubtitleVtt } from './biliSubtitle.mjs';
 
 const ICON_CC = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg>';

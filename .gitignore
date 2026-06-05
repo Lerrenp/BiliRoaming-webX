@@ -30,3 +30,6 @@ build/
 
 # Playwright (debug artifacts)
 .playwright-cli/
+
+# Development documents (moved out of repo main scope)
+dev-docs/

@@ -1,12 +1,22 @@
-// BiliBili 字幕适配层
-// 解决 B 站 PGC 受限页字幕问题：原生页面有字幕但被区域限制隐藏，
-// 我们用 ArtPlayer 接管后，从 PGC 字幕 view API 拉字幕再注入。
+// B 站字幕适配层。
 //
-// 数据流：B 站字幕 protobuf view (binary) → 解码 subtitle_url →
-//         XOR 解码得到 aisubtitle JSON URL → 拉 JSON → 转 WebVTT →
-//         喂给 ArtPlayer 的 art.subtitle.init({url, type:'vtt'})。
+// 解决 PGC 受限页字幕问题：原生页面有字幕但被区域限制隐藏，我们用 ArtPlayer 接管后，
+// 从 PGC 字幕 view API 拉字幕再注入。
 //
-// 切集：传新 (aid, cid) 给 reload()，重复上面流程。
+// 数据流：
+//   B 站字幕 protobuf view (binary)
+//     → parseSubtitleViewProto 解出 subtitle_url（base64 + XOR 编码）
+//     → decodeBiliSubtitleUrl XOR 解码得 aisubtitle JSON URL
+//     → fetch JSON
+//     → biliJsonToVtt 转 WebVTT
+//     → URL.createObjectURL(Blob) → 喂给 ArtPlayer art.subtitle.init({url, type:'vtt'})
+//
+// 切集：传新 (aid, cid) 给 fetchBiliSubtitleVtt()，重复上面流程。
+//
+// Protobuf schema（手解，非 protobufjs）：
+//   外层: 1 → wrapper_msg
+//   wrapper_msg: 3 → Subtitle
+//   Subtitle: 1=id(int), 2=aid_string, 3=lan, 4=lan_doc, 5=subtitle_url(string)
 
 const BILI_SUBTITLE_KEYS = Object.freeze([
   { key: 'nP](wOFRvU.+<fjS{jn-!$D|Dz&",zT`', prefix: '=CFxYRn{.y|uVyO$uh&sikph?N.ilF/`' },

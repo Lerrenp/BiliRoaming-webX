@@ -1,4 +1,8 @@
+// 工具栏弹窗（popup）逻辑。
+// 通过 chrome.runtime.sendMessage 读写 background 的配置（GET_CONFIG / SET_CONFIG）。
+// accessKey 读取：优先用 chrome.tabs.sendMessage 走 content script，回退到 chrome.scripting 直接执行。
 import { DEFAULT_CONFIG } from '../common/constants.mjs';
+
 const ids = ['enabled', 'serverBaseUrl', 'clientMode', 'area', 'webRoamingHeaders', 'accessKey', 'defaultQn', 'defaultCodec', 'defaultAudioId'];
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +38,9 @@ async function save() {
 }
 
 async function readKey() {
+  // 优先走 content script（响应 BRX_PLAYER_READ_ACCESS_KEY），拿不到时回退到
+  // chrome.scripting.executeScript 直接读 localStorage。两路都失败说明当前页
+  // 不是 B 站登录态，提示用户先登录。
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   let ak = null;
   if (tab?.id && tab.url && /^https?:\/\/(www\.)?bilibili\.com\//.test(tab.url)) {
@@ -63,7 +70,6 @@ async function reloadActiveTab() {
   if (tab?.id) await chrome.tabs.reload(tab.id);
   window.close();
 }
-
 
 $('save').addEventListener('click', save);
 $('readKey').addEventListener('click', readKey);

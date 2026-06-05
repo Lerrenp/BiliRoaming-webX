@@ -1,4 +1,9 @@
+// 高级选项页（options）逻辑。
+// 与 popup 共用同一份 DEFAULT_CONFIG + 同一组 ids，UI 字段完全一致。
+// 区别：popup 是快速开关面板（固定宽度 360px），options 是 chrome://extensions → 选项 全屏页。
+// 通过 chrome.runtime.sendMessage 读写 background 的配置。
 import { DEFAULT_CONFIG } from '../common/constants.mjs';
+
 const ids = ['enabled', 'serverBaseUrl', 'clientMode', 'area', 'webRoamingHeaders', 'accessKey', 'defaultQn', 'defaultCodec', 'defaultAudioId'];
 const $ = (id) => document.getElementById(id);
 

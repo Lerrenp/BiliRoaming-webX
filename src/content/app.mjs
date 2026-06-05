@@ -1,3 +1,28 @@
+// BiliRoaming-X Player — ISOLATED world 主入口。
+//
+// 启动流程：
+//   1. startContentApp() 注册 PageBridge，监听 MAIN 的 BRX_PLAYER_START / BRX_PLAYER_EPISODE_SELECT。
+//   2. handleStart() 启动一次完整解锁流程：
+//        a) GMT 防御（标题含"僅限港澳台地區"）
+//        b) FETCH_EP_INFO 非破坏性合并补 aid/cid
+//        c) 选集高亮 (brx-episode-selected)
+//        d) FETCH_PLAYURL 拉 BiliRoaming DASH JSON
+//        e) mountPlayer() 创建 ArtPlayer + dash.js
+//        f) unhideCommentModule() + switchBiliComments() 修评论 lazy-load
+//
+// 单飞保护（事务管理）：
+//   - startTxnSeq  单调递增
+//   - inFlightKey  标记正在请求的 epId:cid
+//   - pendingCandidateKey 标记排队中的候选
+//   - 每个 await 阶段后用 abortIfStale() 检查自己是否仍是最新的，旧事务直接 return，
+//     避免旧 playurl 响应覆盖新播放器（修复历史：VisionPlayer 时代并发竞态）。
+//
+// 防御层次：
+//   - MAIN world 已经在 isGmtOnly() 拦过；ISOLATED 看不到 __playinfo__，用 context.limited + 标题正则。
+//   - context.epId 缺失时直接 return（无 epId 服务端 -412）。
+//   - playurl.code !== 0 抛错。
+//   - mountPlayer 完成后再次 abortIfStale 再交接高亮/评论逻辑。
+
 import { BRX } from '../common/constants.mjs';
 import { createLogger } from '../common/logger.mjs';
 import { stripAreaLimitUi, unhideCommentModule, switchBiliComments } from '../common/dom.mjs';
@@ -63,6 +88,8 @@ export async function startContentApp() {
   bridge.on(BRX.EPISODE_SELECT, (p) => handleStart(p, 'episode-select'));
   bridge.start();
 
+  // popup.js 的 readKey() 通过 chrome.tabs.sendMessage 调用本处理器，从 localStorage
+  // 读 access_key 回投。ISOLATED 能访问 B 站页面的 localStorage（同一 document）。
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg?.type === 'BRX_PLAYER_READ_ACCESS_KEY') {
       sendResponse({ accessKey: localStorage.getItem('access_key') || localStorage.access_key || '' });
@@ -95,13 +122,13 @@ async function handleStart(payload, reason) {
       return;
     }
 
+    // 非破坏性合并：只填补缺失字段，绝不用 null/'' 覆盖已有值。
+    // 修复历史：曾因 FETCH_EP_INFO 用错端点返回 {cid:null}，把 MAIN 已经传过来的有效 cid 覆盖。
     let context = { ...context0 };
     if (context.epId) {
       try {
         const patch = await sendRuntime('FETCH_EP_INFO', { epId: context.epId });
         if (abortIfStale(tx, 'fetch-ep-info')) return;
-        // 非破坏性合并：只填补缺失字段，绝不用 null/'' 覆盖已有值。
-        // 修复历史：曾因 FETCH_EP_INFO 用错端点返回 {cid:null}，把 MAIN 已经传过来的有效 cid 覆盖。
         for (const k of ['epId', 'aid', 'cid', 'bvid', 'duration']) {
           const v = patch?.[k];
           if (v !== undefined && v !== null && v !== '') context[k] = v;
@@ -170,9 +197,15 @@ async function handleStart(payload, reason) {
 }
 
 function summarize(resp) {
+  // 适配 B 站 playurl v2 多种嵌套位置（result.dash / result.video_info.dash / data.dash）。
   const dash = resp?.result?.dash || resp?.result?.video_info?.dash || resp?.dash || resp?.data?.dash;
   return { video: dash?.video?.length || 0, audio: dash?.audio?.length || 0, duration: dash?.duration || 0 };
 }
+
+// ====== 选集高亮 ======
+// 在 B 站原生选集列表 a[href*="/bangumi/play/ep"] 上叠加 .brx-episode-selected。
+// 同步识别 B 站 CSS Module 选集高亮 class（numberListItem_select__xxx）并保留，
+// 不与原生选中态冲突。
 
 function ensureEpisodeHighlightStyle() {
   if (document.getElementById('brx-episode-highlight-style')) return;

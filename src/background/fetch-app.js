@@ -1,4 +1,17 @@
-// ====== App 模式 fetchPlayurl（Android 签名） ======
+// App 模式 fetchPlayurl（Android 端签名 + BiliRoaming 转发）。
+//
+// 路径选择（按 area）：
+//   - th (泰国/东南亚)  → <base>/intl/gateway/v2/ogv/playurl   （bstar_a 签名集）
+//   - 其它 (hk/tw/cn)   → <base>/pgc/player/api/playurl        （android 签名集）
+//
+// 签名算法（与 B 站 Android API 一致）：
+//   sign = MD5( sort(params) + appsec )
+//   - 所有 key 按字典序排序
+//   - 编码用 encodeURIComponent，& 连接
+//   - 末尾直接拼 appsec，MD5 后小写 32 字符
+//
+// 凭证来源：APP_SIGN 中的 appkey / appsec / build 来自 B 站官方 Android 客户端公开配置，
+// 与 BiliRoaming 生态（油猴脚本、Xposed 模块）共用同一组。不是用户私人凭证。
 
 function md5(inputString) {
   var hc='0123456789abcdef';
