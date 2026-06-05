@@ -139,7 +139,7 @@ ArtPlayer 自身没有 DASH 原生支持，`artplayer-plugin-dash-control` 只�
 ### 安装
 
 目前还在早期版本，发布到 Chrome Web Store 之前你可以尝试寻找release中有没有发布版本，如果没有你有两种方式安装：
-
+注：如果edge报告“本地安装此扩展不是来自任何已知来源”是微软安全又发力了，把crx改成zip直接拖进去就成。
 **方式 1：加载未打包扩展（推荐开发者）**
 
 1. 克隆仓库到本地：
