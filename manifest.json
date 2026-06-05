@@ -1,15 +1,14 @@
 {
   "manifest_version": 3,
   "name": "BiliRoaming-X Player",
-  "version": "0.3.1",
+  "version": "0.3.0",
   "description": "B 站区域限制番剧覆盖式播放器（v0.3 ArtPlayer 迁移中）",
-  "minimum_chrome_version": "121",
+  "minimum_chrome_version": "120",
   "permissions": [
     "storage",
     "tabs",
     "activeTab",
-    "scripting",
-    "declarativeNetRequestWithHostAccess"
+    "scripting"
   ],
   "host_permissions": [
     "*://*.bilibili.com/*",
