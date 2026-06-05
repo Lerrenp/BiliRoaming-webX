@@ -1,5 +1,6 @@
 import { waitForElement, stripAreaLimitUi } from '../../common/dom.mjs';
 import { extractDash, uniqueQualities, uniqueCodecs, audioOptions, createMpdUrl, selectStreams } from './dashMpdBuilder.mjs';
+import { fetchBiliSubtitleVtt } from '../subtitle/biliSubtitle.mjs';
 
 export async function mountPlayer({ playurl, context, config, log }) {
   const dash = extractDash(playurl);
@@ -45,6 +46,8 @@ export async function mountPlayer({ playurl, context, config, log }) {
   let art = null;
   let dashPlayer = null;
   let resizeObserver = null;
+  let subtitleBlobUrl = '';
+  let subtitleAbort = null;
 
   function nextMpdUrl() {
     if (mpdObjectUrl) URL.revokeObjectURL(mpdObjectUrl);
@@ -107,6 +110,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   art.on('ready', async () => {
     installResizeRelay();
+    loadSubtitle();
     window.__BRX_PLAYER_DEBUG__ = Object.assign(window.__BRX_PLAYER_DEBUG__ || {}, { art, dashPlayer });
   });
 
@@ -181,6 +185,36 @@ export async function mountPlayer({ playurl, context, config, log }) {
     return plugins;
   }
 
+  // 拉 B 站 PGC 字幕 → 喂给 ArtPlayer
+  // 切集时 destroy() 会 abort 上一个请求，再 mount 就会重新跑一遍
+  async function loadSubtitle() {
+    if (!art || !art.subtitle?.init) return;
+    const cid = Number(context?.cid);
+    const aid = Number(context?.aid);
+    if (!cid || !aid) {
+      log?.info?.('subtitle: skip, no cid/aid', { context });
+      return;
+    }
+    if (subtitleAbort) { try { subtitleAbort.abort(); } catch (_) {} }
+    subtitleAbort = new AbortController();
+    try {
+      const result = await fetchBiliSubtitleVtt({ cid, aid }, { signal: subtitleAbort.signal, log });
+      if (!result || !art.subtitle?.init) return;
+      if (subtitleBlobUrl) { try { URL.revokeObjectURL(subtitleBlobUrl); } catch (_) {} }
+      subtitleBlobUrl = result.blobUrl;
+      art.subtitle.init({
+        url: result.blobUrl,
+        type: 'vtt',
+        name: result.lanDoc || result.lan || 'BiliSubtitle',
+        escape: false,
+      });
+      log?.info?.('subtitle: loaded', { lan: result.lan, lanDoc: result.lanDoc, items: result.itemCount });
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      log?.warn?.('subtitle: load failed', err);
+    }
+  }
+
   function installResizeRelay() {
     if (resizeObserver || !window.ResizeObserver) return;
     resizeObserver = new ResizeObserver(() => {});
@@ -206,6 +240,8 @@ export async function mountPlayer({ playurl, context, config, log }) {
     get dashPlayer() { return dashPlayer; },
     get selection() { return selection; },
     destroy() {
+      if (subtitleAbort) { try { subtitleAbort.abort(); } catch (_) {} subtitleAbort = null; }
+      if (subtitleBlobUrl) { try { URL.revokeObjectURL(subtitleBlobUrl); } catch (_) {} subtitleBlobUrl = ''; }
       document.removeEventListener('fullscreenchange', onGlobalFullscreenChange);
       try { resizeObserver?.disconnect?.(); } catch (_) {}
       try { dashPlayer?.reset?.(); } catch (_) {}

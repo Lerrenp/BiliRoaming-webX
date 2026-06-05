@@ -65,6 +65,7 @@
         "src/content/bridge.mjs",
         "src/content/player/dashMpdBuilder.mjs",
         "src/content/player/mountPlayer.mjs",
+        "src/content/subtitle/biliSubtitle.mjs",
         "src/common/constants.mjs",
         "src/common/logger.mjs",
         "src/common/dom.mjs",
