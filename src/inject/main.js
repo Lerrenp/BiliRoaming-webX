@@ -2,6 +2,11 @@
   'use strict';
   if (window.__BRX_PLAYER_MAIN_INJECTED__) return;
   window.__BRX_PLAYER_MAIN_INJECTED__ = true;
+  // 对所有 bangumi 页面立即注入 no-referrer，防止视频 CDN 因 Referer 返回 403。
+  // document_start 阶段注入，先于任何资源加载。
+  if (/\/bangumi\/play\//.test(location.pathname)){
+    try{ const m=document.createElement('meta'); m.name='referrer'; m.content='no-referrer'; (document.head||document.documentElement).appendChild(m); }catch(_){}
+  }
   const SOURCE = 'BRX_PLAYER_MAIN';
   const log = (...args) => { try { console.debug('[BRX-Player MAIN]', ...args); } catch (_) {} };
   let playinfoValue;
