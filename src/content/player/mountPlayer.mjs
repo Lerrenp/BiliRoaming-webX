@@ -216,19 +216,9 @@ export async function mountPlayer({ playurl, context, config, log }) {
   }
 
   function installDanmakuPersistence() {
-    // 弹幕设置变更时自动保存到 chrome.storage.sync
-    const $dm = document.querySelector('.artplayer-plugin-danmuku');
-    if (!$dm) return;
-    const save = () => {
-      const $t = $dm.querySelector('.apd-toggle');
-      const visible = $t ? !$t.querySelector('[class*="off"]') : true;
-      const $sync = $dm.querySelector('.apd-sync-video');
-      const sync = $sync ? !$sync.querySelector('[class*="check_off"]') : false;
-      const $ao = $dm.querySelector('.apd-anti-overlap');
-      const antiOverlap = $ao ? !$ao.querySelector('[class*="check_off"]') : false;
-      try { chrome.storage.sync.set({ brx_danmaku: { visible, synchronousPlayback: sync, antiOverlap } }); } catch (_) {}
-    };
-    $dm.addEventListener('click', () => setTimeout(save, 100));
+    // 弹幕显隐通过插件事件监听（事件名拼写：Danmuku 不是 Danmaku）
+    art.on('artplayerPluginDanmuku:show', () => { try { chrome.storage.sync.set({ brx_danmaku: { visible: true } }); } catch (_) {} });
+    art.on('artplayerPluginDanmuku:hide', () => { try { chrome.storage.sync.set({ brx_danmaku: { visible: false } }); } catch (_) {} });
   }
 
   function onGlobalFullscreenChange() {}
