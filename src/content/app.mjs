@@ -1,6 +1,6 @@
 import { BRX } from '../common/constants.mjs';
 import { createLogger } from '../common/logger.mjs';
-import { stripAreaLimitUi } from '../common/dom.mjs';
+import { stripAreaLimitUi, unhideCommentModule } from '../common/dom.mjs';
 import { PageBridge, sendRuntime } from './bridge.mjs';
 import { mountPlayer } from './player/mountPlayer.mjs';
 
@@ -71,6 +71,11 @@ async function handleStart(payload, reason) {
   }
   currentController = await mountPlayer({ playurl, context, config: cfg, log });
   if (context.epId) updateEpisodeHighlight(context.epId);
+
+  // 受限页 B 站 React 会把评论区设为 display:none，导致 <bili-comments lazy-load>
+  // 永远不触发。解锁后把评论区显示出来，IntersectionObserver 在用户滚动到评论区时
+  // 会自动触发 lazy-load 拉取评论。
+  unhideCommentModule();
 
   window.__BRX_PLAYER_DEBUG__ = {
     state: 'mounted',
