@@ -19,8 +19,7 @@ async function enableDnrForTab(tabId) {
       },
       condition: {
         tabIds: [tabId],
-        urlFilter: '*upos*/*.m4s*',
-        resourceTypes: ['media', 'xmlhttprequest']
+        urlFilter: '*upos*',
       }
     }];
     await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] });
