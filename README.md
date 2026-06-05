@@ -27,6 +27,10 @@
     - [安装](#安装)
     - [使用](#使用)
   - [配置项说明](#配置项说明)
+    - [⚠️ 关于 App 模式（暂时不可用）](#️-关于-app-模式暂时不可用)
+  - [🔑 access_key 获取教程](#-access_key-获取教程)
+    - [安装步骤](#安装步骤)
+    - [使用步骤（2 种方式任选）](#使用步骤2-种方式任选)
   - [开发说明](#开发说明)
     - [模块划分原则](#模块划分原则)
     - [调试变量](#调试变量)
@@ -176,13 +180,78 @@ playwright-cli open https://www.bilibili.com/bangumi/play/ss44467/ --headed --pe
 |---|---|---|
 | **启用扩展播放器** | 总开关 | 关掉后所有行为都停 |
 | **服务端地址** | BiliRoaming 代理 URL | 默认 `https://bili.xcnya.cn`（独苗啊独苗别给骑爆了） |
-| **模式** | `web` / `app` | Web 模式无需 access_key；App 模式签名更稳 |
+| **模式** | `web` / `app` | ⚠️ App 模式因 SSL 403 暂时不可用，请用 web 模式 |
 | **区域** | `hk` / `tw` / `th` / `cn` | 不同服务端支持不同的地区组合 |
 | **Web 模式发送漫游请求头** | 开关 | 旧 PHP 后端报 `code=-15` 时关掉 |
-| **Access Key** | App 模式签名用 | 留空走 web 模式；可点按钮从 B 站 localStorage 自动读取 |
+| **Access Key** | App 模式签名用（当前 web 模式可忽略） | 留空走 web 模式；可点按钮从 B 站 localStorage 自动读取 |
 | **清晰度 / 编码 / 音轨** | 默认值 | 播放时可临时切换 |
 
 > 💡 access_key 不会上传到任何第三方服务，全部存在本地 `chrome.storage.sync`。
+
+### ⚠️ 关于 App 模式（暂时不可用）
+
+`App 模式`（即走 B 站 Android 端 `appkey` + `appsec` 签名通道）
+**当前因服务端 SSL 握手问题暂不可用** —— 公共 BiliRoaming 代理
+返回 `403`（部分场景是 `SSL handshake failed`），不是我们前端签名
+逻辑错误。
+
+> 报错大致形如：  
+> `BiliRoaming playurl failed: {"code":-...,"message":"..."}` 或  
+> `net::ERR_CERT_...` / `SSL routines: ssl3_read_bytes`
+
+**目前的推荐做法：**
+
+- **保持 `web` 模式** —— 大多数公共 BiliRoaming 服务端
+  （`bili.xcnya.cn` / 自建）都直接支持 web 通道，无需 access_key 也能拿流。
+- access_key 暂时是**冗余配置**，popup 里的"Access Key"输入框可以**留空**。
+- 等服务端 SSL 修好或切到新代理后，App 模式会自动恢复（无需改代码）。
+
+**用户侧无需操作**；如果你自己部署 BiliRoaming 服务端遇到 403，
+可以检查 `nginx` 证书链 + 上游 B 站 `api.bilibili.com` 的 TLS 版本
+（多数是 1.0/1.1 协商失败）。
+
+---
+
+## 🔑 access_key 获取教程
+
+虽然 App 模式暂不可用，但**未来 SSL 修好后**还需要 access_key。
+本仓库附带一个独立油猴脚本，让你**不需要登录 B 站主站**就能拿到 access_key：
+
+📄 [`userscripts/balh_access_key_helper.user.js`](./userscripts/balh_access_key_helper.user.js)
+v3.2.0 · MIT License · 基于 [ipcjs/bilibili-helper](https://github.com/ipcjs/bilibili-helper) 改造
+
+### 安装步骤
+
+1. 浏览器装 [Tampermonkey](https://www.tampermonkey.net/)（或兼容的 Userscript 插件）
+2. 把 `userscripts/balh_access_key_helper.user.js` 拖进 Chrome 扩展页安装
+   （或者从文件管理器双击，浏览器会提示是否安装）
+3. 打开任意 B 站页面（推荐 B 站主页 `https://www.bilibili.com/`）
+
+### 使用步骤（2 种方式任选）
+
+#### 方式 1：手动输入
+
+1. 在弹窗的"Access Key"输入框里粘贴你已有的 access_key
+2. 点"保存 access_key"
+3. 关闭浮层即可
+
+#### 方式 2：二维码自动获取（推荐）
+
+1. 点击弹窗里的"自动获取 access_key"按钮
+2. 脚本会调 B 站 TV 登录接口，拿到一个 `auth_code`
+3. 用 B 站**手机 App** 扫描浮层里显示的二维码
+4. App 上确认后，access_key 自动写入 `localStorage.access_key`
+
+### 写入 popup
+
+拿到 access_key 后，回到本扩展 popup：
+
+1. 点 "从当前 B 站页面读取 access_key" 按钮
+2. 弹窗提示"已读取 access_key，请保存"
+3. 点 "保存配置" 即可
+
+> 💡 access_key 与 B 站账号绑定，**不绑定 session**；
+> 一次获取，过期前（默认 1 年）可重复使用。
 
 ---
 
@@ -248,6 +317,8 @@ biliExtensionsplayer/
 │   └── options/               # 高级配置页
 ├── vendor/                    # 第三方 bundle（ArtPlayer / dash.js / 弹幕）
 ├── assets/                    # 图标
+├── userscripts/               # 配套用户脚本
+│   └── balh_access_key_helper.user.js  # access_key 获取助手（油猴）
 ├── scripts/
 │   └── check-syntax.mjs       # 静态检查
 ├── dev-docs/                  # 开发期文档（不进 git）
