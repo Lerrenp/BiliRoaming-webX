@@ -178,7 +178,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
       }
       const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
       // 从 chrome.storage 加载已保存的弹幕设置
-      const dmDefaults = { speed:5, opacity:0.9, fontSize:25, antiOverlap:true, synchronousPlayback:true, visible:true };
+      const dmDefaults = { speed:5, opacity:0.9, fontSize:25, margin:25, antiOverlap:true, synchronousPlayback:true, visible:true, modes:[0,1,2] };
       const dmOpts = { ...dmDefaults, ...dmSaved, danmuku: danmukuUrl, emitter: false, heatmap: false, filter: (d) => d.text.trim().length > 0 };
       plugins.push(window.artplayerPluginDanmuku(dmOpts));
     }
@@ -215,10 +215,42 @@ export async function mountPlayer({ playurl, context, config, log }) {
     if (art?.video) resizeObserver.observe(art.video);
   }
 
+  let dmSaveTimer = null;
   function installDanmakuPersistence() {
-    // 弹幕显隐通过插件事件监听（事件名拼写：Danmuku 不是 Danmaku）
     art.on('artplayerPluginDanmuku:show', () => { try { chrome.storage.sync.set({ brx_danmaku: { visible: true } }); } catch (_) {} });
     art.on('artplayerPluginDanmuku:hide', () => { try { chrome.storage.sync.set({ brx_danmaku: { visible: false } }); } catch (_) {} });
+    // 每 5s 全量保存弹幕面板设置（字号/速度/透明度等滑块和复选框）
+    dmSaveTimer = setInterval(saveDanmakuAll, 5000);
+  }
+
+  function saveDanmakuAll() {
+    try {
+      const $dm = document.querySelector('.artplayer-plugin-danmuku');
+      if (!$dm) return;
+      const readVal = (sel) => { const el = $dm.querySelector(sel + ' .apd-value'); return el ? parseFloat(el.textContent) || 0 : 0; };
+      const readBool = (sel) => { const el = $dm.querySelector(sel); if (!el) return false; return !el.querySelector('[class*="check_off"]'); };
+      const readModes = () => {
+        const modes = [];
+        $dm.querySelectorAll('.apd-config-mode .apd-mode').forEach(el => {
+          if (!el.querySelector('[class*="mode_off"]')) modes.push(Number(el.dataset.mode));
+        });
+        return modes.length ? modes : [0, 1, 2];
+      };
+      // 先读当前值，再合并（visible 由事件独立管理）
+      chrome.storage.sync.get('brx_danmaku', (prev) => {
+        const p = prev?.brx_danmaku || {};
+        chrome.storage.sync.set({ brx_danmaku: {
+          ...p,
+          speed: readVal('.apd-config-speed') || 5,
+          opacity: readVal('.apd-config-opacity') || 0.9,
+          fontSize: readVal('.apd-config-fontSize') || 25,
+          margin: readVal('.apd-config-margin') || 25,
+          antiOverlap: readBool('.apd-anti-overlap'),
+          synchronousPlayback: readBool('.apd-sync-video'),
+          modes: readModes(),
+        }});
+      });
+    } catch (_) {}
   }
 
   function onGlobalFullscreenChange() {}
@@ -238,6 +270,8 @@ export async function mountPlayer({ playurl, context, config, log }) {
     get dashPlayer() { return dashPlayer; },
     get selection() { return selection; },
     destroy() {
+      if (dmSaveTimer) { clearInterval(dmSaveTimer); dmSaveTimer = null; }
+      saveDanmakuAll();
       try { subtitleManager?.dispose?.(); } catch (_) {}
       subtitleManager = null;
       document.removeEventListener('fullscreenchange', onGlobalFullscreenChange);
