@@ -6,7 +6,8 @@ import { DEFAULT_CONFIG } from '../common/constants.mjs';
 const dnrTabs = new Set();
 
 async function enableDnrForTab(tabId) {
-  if (!tabId || dnrTabs.has(tabId)) return;
+  if (!tabId || dnrTabs.has(tabId)) return { ok: true, tabId, reason: 'already-enabled' };
+  if (!chrome.declarativeNetRequest) return { ok: false, tabId, reason: 'no-dnr-api' };
   dnrTabs.add(tabId);
   try {
     const rules = [{
@@ -22,10 +23,13 @@ async function enableDnrForTab(tabId) {
         resourceTypes: ['media', 'xmlhttprequest']
       }
     }];
-    // 先删再加以防 rule id 冲突
     await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [tabId] });
     await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules });
-  } catch (e) { /* DNR may fail if permission not granted; extension still works */ }
+    return { ok: true, tabId, ruleCount: 1 };
+  } catch (e) {
+    dnrTabs.delete(tabId);
+    return { ok: false, tabId, reason: 'dnr-error', error: String(e && e.message || e).slice(0, 200) };
+  }
 }
 
 async function disableDnrForTab(tabId) {
@@ -59,7 +63,7 @@ async function handleAction(action, payload, sender) {
   if (action === 'FETCH_PLAYURL') return fetchPlayurl(payload.context || {});
   if (action === 'FETCH_EP_INFO') return fetchEpInfo(payload.epId);
   if (action === 'FETCH_TEXT') return fetchText(payload.url);
-  if (action === 'ENABLE_DNR') { await enableDnrForTab(sender?.tab?.id); return { ok: true }; }
+  if (action === 'ENABLE_DNR') return enableDnrForTab(sender?.tab?.id);
   throw new Error('Unknown action: ' + action);
 }
 // ====== MD5 (for Bilibili app signing) ======

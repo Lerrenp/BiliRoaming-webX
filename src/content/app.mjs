@@ -48,7 +48,7 @@ async function handleStart(payload, reason) {
   }
 
   // 仅受限番剧标签页启用 DNR Referer 剥离（不影响普通视频/主站/其他网站）
-  sendRuntime('ENABLE_DNR', {}).catch(() => {});
+  sendRuntime('ENABLE_DNR', {}).then(r => log.info('DNR enable result:', r)).catch(e => log.error('DNR enable failed:', e));
 
   let context = { ...context0 };
   if (context.epId) {
