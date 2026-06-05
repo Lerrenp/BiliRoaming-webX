@@ -177,7 +177,6 @@ export async function mountPlayer({ playurl, context, config, log }) {
         log.warn('danmuku: skip load, context.cid missing', { context });
       }
       const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
-      // 从 chrome.storage 加载已保存的弹幕设置
       const dmDefaults = { speed:5, opacity:0.9, fontSize:25, antiOverlap:true, synchronousPlayback:true, visible:true, modes:[0,1,2] };
       const dmOpts = { ...dmDefaults, ...dmSaved, danmuku: danmukuUrl, emitter: false, heatmap: false, filter: (d) => d.text.trim().length > 0 };
       plugins.push(window.artplayerPluginDanmuku(dmOpts));
@@ -217,39 +216,23 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   let dmSaveTimer = null;
   function installDanmakuPersistence() {
-    art.on('artplayerPluginDanmuku:show', () => { try { chrome.storage.sync.set({ brx_danmaku: { visible: true } }); } catch (_) {} });
-    art.on('artplayerPluginDanmuku:hide', () => { try { chrome.storage.sync.set({ brx_danmaku: { visible: false } }); } catch (_) {} });
-    // 每 5s 全量保存弹幕面板设置（字号/速度/透明度等滑块和复选框）
-    dmSaveTimer = setInterval(saveDanmakuAll, 5000);
-  }
-
-  function saveDanmakuAll() {
-    try {
-      const $dm = document.querySelector('.artplayer-plugin-danmuku');
-      if (!$dm) return;
-      const readVal = (sel) => { const el = $dm.querySelector(sel + ' .apd-value'); return el ? parseFloat(el.textContent) || 0 : 0; };
-      const readBool = (sel) => { const el = $dm.querySelector(sel); if (!el) return false; return !el.querySelector('[class*="check_off"]'); };
-      const readModes = () => {
-        const modes = [];
-        $dm.querySelectorAll('.apd-config-mode .apd-mode').forEach(el => {
-          if (!el.querySelector('[class*="mode_off"]')) modes.push(Number(el.dataset.mode));
-        });
-        return modes.length ? modes : [0, 1, 2];
-      };
-      // 先读当前值，再合并（visible 由事件独立管理，margin 不持久化）
-      chrome.storage.sync.get('brx_danmaku', (prev) => {
-        const p = prev?.brx_danmaku || {};
+    // 从插件实例读取真实 option，定时全量保存
+    dmSaveTimer = setInterval(() => {
+      try {
+        const dm = art.plugins?.cache?.get?.('artplayerPluginDanmuku');
+        if (!dm?.option) return;
+        const opt = dm.option;
         chrome.storage.sync.set({ brx_danmaku: {
-          ...p,
-          speed: readVal('.apd-config-speed') || 5,
-          opacity: readVal('.apd-config-opacity') || 0.9,
-          fontSize: readVal('.apd-config-fontSize') || 25,
-          antiOverlap: readBool('.apd-anti-overlap'),
-          synchronousPlayback: readBool('.apd-sync-video'),
-          modes: readModes(),
+          visible: opt.visible !== false,
+          speed: opt.speed,
+          opacity: opt.opacity,
+          fontSize: opt.fontSize,
+          antiOverlap: opt.antiOverlap,
+          synchronousPlayback: opt.synchronousPlayback,
+          modes: opt.modes ? [...opt.modes] : [0,1,2],
         }});
-      });
-    } catch (_) {}
+      } catch (_) {}
+    }, 3000);
   }
 
   function onGlobalFullscreenChange() {}
@@ -270,7 +253,6 @@ export async function mountPlayer({ playurl, context, config, log }) {
     get selection() { return selection; },
     destroy() {
       if (dmSaveTimer) { clearInterval(dmSaveTimer); dmSaveTimer = null; }
-      saveDanmakuAll();
       try { subtitleManager?.dispose?.(); } catch (_) {}
       subtitleManager = null;
       document.removeEventListener('fullscreenchange', onGlobalFullscreenChange);
