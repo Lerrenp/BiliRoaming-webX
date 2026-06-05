@@ -1,6 +1,6 @@
 import { waitForElement, stripAreaLimitUi } from '../../common/dom.mjs';
 import { extractDash, uniqueQualities, uniqueCodecs, audioOptions, createMpdUrl, selectStreams } from './dashMpdBuilder.mjs';
-import { fetchBiliSubtitleVtt } from '../subtitle/biliSubtitle.mjs';
+import { SubtitleManager } from '../subtitle/subtitlePlugin.mjs';
 
 export async function mountPlayer({ playurl, context, config, log }) {
   const dash = extractDash(playurl);
@@ -46,8 +46,8 @@ export async function mountPlayer({ playurl, context, config, log }) {
   let art = null;
   let dashPlayer = null;
   let resizeObserver = null;
-  let subtitleBlobUrl = '';
-  let subtitleAbort = null;
+  let subtitleManager = null;
+  let danmukuPluginInstance = null;
 
   function nextMpdUrl() {
     if (mpdObjectUrl) URL.revokeObjectURL(mpdObjectUrl);
@@ -110,7 +110,9 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   art.on('ready', async () => {
     installResizeRelay();
-    loadSubtitle();
+    buildDanmukuControl();
+    buildSubtitleControl();
+    await loadSubtitle();
     window.__BRX_PLAYER_DEBUG__ = Object.assign(window.__BRX_PLAYER_DEBUG__ || {}, { art, dashPlayer });
   });
 
@@ -166,7 +168,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
         log.warn('danmuku: skip load, context.cid missing', { context });
       }
       const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
-      plugins.push(window.artplayerPluginDanmuku({
+      const danmukuPlugin = window.artplayerPluginDanmuku({
         danmuku: danmukuUrl,
         speed: 5,
         opacity: 0.9,
@@ -177,7 +179,16 @@ export async function mountPlayer({ playurl, context, config, log }) {
         emitter: false,
         heatmap: false,
         filter: (danmu) => danmu.text.trim().length > 0,
-      }));
+      });
+      // 包装插件实例，方便后续拿 show()/hide()
+      const wrapped = (a) => {
+        const inst = danmukuPlugin(a);
+        if (!danmukuPluginInstance && inst) danmukuPluginInstance = inst;
+        return inst;
+      };
+      // 保留 icons 静态属性
+      wrapped.icons = danmukuPlugin.icons;
+      plugins.push(wrapped);
     }
     if (window.artplayerPluginDocumentPip) {
       plugins.push(window.artplayerPluginDocumentPip({ width: 640, height: 360, fallbackToVideoPiP: false, placeholder: '正在以画中画播放' }));
@@ -185,34 +196,54 @@ export async function mountPlayer({ playurl, context, config, log }) {
     return plugins;
   }
 
-  // 拉 B 站 PGC 字幕 → 喂给 ArtPlayer
-  // 切集时 destroy() 会 abort 上一个请求，再 mount 就会重新跑一遍
+  // 在左侧 controlsLeft 增加弹幕开关（位置：time 之前）
+  function buildDanmukuControl() {
+    if (!art?.controls?.add || !danmukuPluginInstance) return;
+    const $icon = document.createElement('div');
+    $icon.className = 'brx-danmuku-control';
+    $icon.title = '弹幕';
+    const refresh = () => {
+      const hidden = !!danmukuPluginInstance.isHide;
+      $icon.classList.toggle('is-off', hidden);
+      $icon.innerHTML = hidden ? ICON_DM_OFF : ICON_DM;
+    };
+    $icon.innerHTML = danmukuPluginInstance.isHide ? ICON_DM_OFF : ICON_DM;
+    $icon.addEventListener('click', () => {
+      if (danmukuPluginInstance.isHide) danmukuPluginInstance.show();
+      else danmukuPluginInstance.hide();
+      refresh();
+    });
+    art.controls.add({
+      name: 'brxDanmuku',
+      position: 'left',
+      index: 25, // 在 volume(20) 和 time(30) 之间
+      html: '',
+      mounted: ($control) => {
+        $control.appendChild($icon);
+        // 用 setInterval 检测 isHide 变化（外部也能切）
+        setInterval(refresh, 500);
+      },
+    });
+  }
+
+  // 在中间 controlsCenter 增加字幕开关 + 弹出语言切换面板
+  // （弹幕插件原位置，弹幕插件自带的 toggle 我们用 CSS 隐藏）
+  function buildSubtitleControl() {
+    if (!art?.template) return;
+    subtitleManager = new SubtitleManager({ art, log });
+    subtitleManager.buildUI();
+  }
+
+  // 拉 B 站 PGC 字幕 → 喂给 SubtitleManager
   async function loadSubtitle() {
-    if (!art || !art.subtitle?.init) return;
+    if (!subtitleManager) return;
     const cid = Number(context?.cid);
     const aid = Number(context?.aid);
     if (!cid || !aid) {
       log?.info?.('subtitle: skip, no cid/aid', { context });
       return;
     }
-    if (subtitleAbort) { try { subtitleAbort.abort(); } catch (_) {} }
-    subtitleAbort = new AbortController();
-    try {
-      const result = await fetchBiliSubtitleVtt({ cid, aid }, { signal: subtitleAbort.signal, log });
-      if (!result || !art.subtitle?.init) return;
-      if (subtitleBlobUrl) { try { URL.revokeObjectURL(subtitleBlobUrl); } catch (_) {} }
-      subtitleBlobUrl = result.blobUrl;
-      art.subtitle.init({
-        url: result.blobUrl,
-        type: 'vtt',
-        name: result.lanDoc || result.lan || 'BiliSubtitle',
-        escape: false,
-      });
-      log?.info?.('subtitle: loaded', { lan: result.lan, lanDoc: result.lanDoc, items: result.itemCount });
-    } catch (err) {
-      if (err?.name === 'AbortError') return;
-      log?.warn?.('subtitle: load failed', err);
-    }
+    await subtitleManager.load({ cid, aid });
   }
 
   function installResizeRelay() {
@@ -240,8 +271,8 @@ export async function mountPlayer({ playurl, context, config, log }) {
     get dashPlayer() { return dashPlayer; },
     get selection() { return selection; },
     destroy() {
-      if (subtitleAbort) { try { subtitleAbort.abort(); } catch (_) {} subtitleAbort = null; }
-      if (subtitleBlobUrl) { try { URL.revokeObjectURL(subtitleBlobUrl); } catch (_) {} subtitleBlobUrl = ''; }
+      try { subtitleManager?.dispose?.(); } catch (_) {}
+      subtitleManager = null;
       document.removeEventListener('fullscreenchange', onGlobalFullscreenChange);
       try { resizeObserver?.disconnect?.(); } catch (_) {}
       try { dashPlayer?.reset?.(); } catch (_) {}
@@ -257,6 +288,16 @@ async function ensureVendorLoaded() {
   if (!window.dashjs) throw new Error('dash.js content script not loaded');
 }
 
+const ICON_DM = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>';
+const ICON_DM_OFF = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" opacity="0.4"/><line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" stroke-width="1.6"/></svg>';
+
 function cssText() {
-  return `.brx-player-root{position:absolute;inset:0;z-index:999;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.brx-artplayer-box{position:absolute;inset:0;background:#000}.brx-artplayer-box .artplayer{width:100%!important;height:100%!important}.brx-status{position:absolute;left:14px;top:12px;z-index:35;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;transition:opacity .35s}`;
+  return `.brx-player-root{position:absolute;inset:0;z-index:999;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.brx-artplayer-box{position:absolute;inset:0;background:#000}.brx-artplayer-box .artplayer{width:100%!important;height:100%!important}.brx-status{position:absolute;left:14px;top:12px;z-index:35;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:6px;transition:opacity .35s}` +
+    // 弹幕插件自带的控制中心：把开关按钮（apd-toggle）隐藏，发射器（输入框）保留
+    // 我们用 buildDanmukuControl 在左侧放了新的开关
+    `.brx-artplayer-box .apd-toggle{display:none!important}` +
+    // 自定义弹幕开关按钮（在 time 左边）
+    `.brx-danmuku-control{display:flex;align-items:center;height:100%;padding:0 10px;cursor:pointer;opacity:var(--art-control-opacity);transition:opacity var(--art-transition-duration) ease}` +
+    `.brx-danmuku-control:hover{opacity:1}` +
+    `.brx-danmuku-control.is-off{opacity:0.4}`;
 }
