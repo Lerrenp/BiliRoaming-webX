@@ -193,12 +193,16 @@ export class SubtitleManager {
     const $right = this.art.template.$controlsRight;
     if (!$right) return;
 
-    // toggle 按钮塞进 controlsRight 最后面
+    // toggle 塞进 controlsRight 的第一个位置（设置按钮左边 = 弹幕与设置之间）
     const toggle = document.createElement('div');
     toggle.className = 'brx-subtitle-toggle';
     toggle.title = '字幕';
     toggle.innerHTML = ICON_CC;
-    $right.appendChild(toggle);
+    if ($right.firstChild) {
+      $right.insertBefore(toggle, $right.firstChild);
+    } else {
+      $right.appendChild(toggle);
+    }
 
     // 弹出面板挂到播放器容器上（绝对定位），防止被 controls 的 flex 挤压
     const panel = document.createElement('div');
