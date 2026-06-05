@@ -1,4 +1,4 @@
-// BiliRoaming-X Player — 播放器挂载核心。
+// BiliRoaming-webX Player — 播放器挂载核心。
 //
 // 架构：覆盖式播放（不重写 B 站 Player core）
 //   在 #bilibili-player 内追加 .brx-player-root 绝对定位覆盖层，隐藏 B 站原生 <video>，
@@ -39,7 +39,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
   root.className = 'brx-player-root brx-artplayer-root';
   root.innerHTML = `
     <div class="brx-artplayer-box"></div>
-    <div class="brx-status">BiliRoaming-X ArtPlayer</div>
+    <div class="brx-status">BiliRoaming-webX ArtPlayer</div>
   `;
   const style = document.createElement('style');
   style.textContent = cssText();

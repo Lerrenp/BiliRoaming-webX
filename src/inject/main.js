@@ -1,4 +1,4 @@
-// BiliRoaming-X Player — MAIN world 注入（document_start）。
+// BiliRoaming-webX Player — MAIN world 注入（document_start）。
 //
 // 职责：
 //   1. 检测当前 B 站页是否是"仅限港澳台地区"番剧（区域限制页）。

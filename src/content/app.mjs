@@ -1,4 +1,4 @@
-// BiliRoaming-X Player — ISOLATED world 主入口。
+// BiliRoaming-webX Player — ISOLATED world 主入口。
 //
 // 启动流程：
 //   1. startContentApp() 注册 PageBridge，监听 MAIN 的 BRX_PLAYER_START / BRX_PLAYER_EPISODE_SELECT。

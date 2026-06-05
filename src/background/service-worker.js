@@ -1,4 +1,4 @@
-// BiliRoaming-X Player — Background service worker (MV3 + ESM)。
+// BiliRoaming-webX Player — Background service worker (MV3 + ESM)。
 //
 // 消息路由：content script 通过 chrome.runtime.sendMessage 投递 BRX_PLAYER_ACTION，
 // 业务侧只需要 action + payload。本模块负责：

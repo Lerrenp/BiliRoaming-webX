@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "BiliRoaming-X Player",
+  "name": "BiliRoaming-webX Player",
   "version": "0.5.0",
-  "description": "B 站区域限制番剧覆盖式播放器（v0.3 ArtPlayer 迁移中）",
+  "description": "B 站区域限制番剧覆盖式播放器",
   "minimum_chrome_version": "120",
   "permissions": [
     "storage",
@@ -55,7 +55,7 @@
     }
   ],
   "action": {
-    "default_title": "BiliRoaming-X Player",
+    "default_title": "BiliRoaming-webX Player",
     "default_popup": "src/popup/popup.html"
   },
   "options_page": "src/options/options.html",
