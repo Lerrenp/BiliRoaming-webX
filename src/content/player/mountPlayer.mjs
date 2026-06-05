@@ -50,7 +50,16 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   // 从 chrome.storage 加载弹幕已保存设置
   let dmSaved = {};
-  try { const r = await chrome.storage.sync.get('brx_danmaku'); if (r.brx_danmaku) { dmSaved = r.brx_danmaku; delete dmSaved.margin; } } catch (_) {}
+  try {
+    const r = await chrome.storage.sync.get('brx_danmaku');
+    if (r.brx_danmaku && typeof r.brx_danmaku.speed === 'number') {
+      dmSaved = r.brx_danmaku;
+      delete dmSaved.margin;
+    } else {
+      // 旧数据格式（speed 是 NaN 或不存在），清除
+      try { chrome.storage.sync.remove('brx_danmaku'); } catch (_) {}
+    }
+  } catch (_) {}
 
   function nextMpdUrl() {
     if (mpdObjectUrl) URL.revokeObjectURL(mpdObjectUrl);
