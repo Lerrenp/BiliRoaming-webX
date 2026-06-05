@@ -174,7 +174,10 @@ export class SubtitleManager {
         url: track.blobUrl,
         type: 'vtt',
         name: track.lanDoc || track.lan || 'Subtitle',
+        style: {},
+        encoding: 'utf-8',
         escape: false,
+        onVttLoad: (vtt) => vtt,
       });
     } else {
       try {

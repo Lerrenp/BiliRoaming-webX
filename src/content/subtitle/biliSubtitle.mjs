@@ -142,7 +142,6 @@ export async function fetchBiliSubtitleVtt({ cid, aid, type = 1 } = {}, { signal
   if (log) log.info('subtitle: decoded url', { lan: track.lan, jsonUrl: jsonUrl.slice(0, 100) });
 
   const r2 = await fetch(jsonUrl, {
-    credentials: 'include',
     headers: { 'Referer': 'https://www.bilibili.com/' },
     signal,
   });
