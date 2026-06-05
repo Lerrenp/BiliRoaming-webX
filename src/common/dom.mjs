@@ -27,3 +27,20 @@ export function unhideCommentModule(root=document){
   }
   return true;
 }
+
+// 切集后 B 站原生 React 不会重渲染 <bili-comments>（我们拦截了 click 走自己的播放链路），
+// 旧 oid 的评论会一直挂着。直接改 web component 的 oid/type 并 reload。
+// PGC 用 type=1, oid=aid；UGC 用 type=11, oid=av 号。
+export function switchBiliComments({oid,type=1,mode=3}={}){
+  const bc=document.querySelector('bili-comments');
+  if(!bc) return false;
+  const newOid=oid!=null?String(oid):bc.oid;
+  const newType=type!=null?Number(type):Number(bc.type);
+  if(bc.oid===newOid&&Number(bc.type)===newType) return false;
+  bc.oid=newOid;
+  bc.type=newType;
+  bc.setAttribute('data-params',newType+','+newOid);
+  try{ if(typeof bc.unload==='function') bc.unload(); }catch(_){}
+  try{ if(typeof bc.load==='function') bc.load(); }catch(_){}
+  return true;
+}

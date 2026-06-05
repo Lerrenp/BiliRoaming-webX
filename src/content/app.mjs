@@ -1,6 +1,6 @@
 import { BRX } from '../common/constants.mjs';
 import { createLogger } from '../common/logger.mjs';
-import { stripAreaLimitUi, unhideCommentModule } from '../common/dom.mjs';
+import { stripAreaLimitUi, unhideCommentModule, switchBiliComments } from '../common/dom.mjs';
 import { PageBridge, sendRuntime } from './bridge.mjs';
 import { mountPlayer } from './player/mountPlayer.mjs';
 
@@ -76,6 +76,13 @@ async function handleStart(payload, reason) {
   // 永远不触发。解锁后把评论区显示出来，IntersectionObserver 在用户滚动到评论区时
   // 会自动触发 lazy-load 拉取评论。
   unhideCommentModule();
+
+  // 我们拦截了集数 click，没有走 B 站原生 React 流程，<bili-comments> 不会自动切集。
+  // 手动更新 web component 的 oid/type 并 reload 拉新评论。
+  if (context.aid) {
+    const switched = switchBiliComments({ oid: context.aid, type: 1 });
+    log.info('switchBiliComments', { epId: context.epId, aid: context.aid, switched });
+  }
 
   window.__BRX_PLAYER_DEBUG__ = {
     state: 'mounted',
