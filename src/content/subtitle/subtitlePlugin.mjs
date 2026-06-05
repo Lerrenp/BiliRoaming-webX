@@ -13,7 +13,10 @@ const DEFAULT_STYLE={fontSize:28,color:'#FFFFFF',opacity:1.0,bottom:8};
 const COLORS=['#FFFFFF','#00FF00','#FFFF00','#00FFFF','#FF8800','#FF00FF','#FF4444','#8888FF'];
 
 export class SubtitleManager {
-  constructor({art,log}){this.art=art;this.log=log;this.tracks=[];this.currentIndex=-1;this._abort=null;this._uiBuilt=false;this.convMode='none';this.convFn=null;this.style={...DEFAULT_STYLE};this._convOpen=false;this._styleOpen=false;}
+  constructor({art,log}){this.art=art;this.log=log;this.tracks=[];this.currentIndex=-1;this._abort=null;this._uiBuilt=false;this.convMode='none';this.convFn=null;this.style={...DEFAULT_STYLE};this._convOpen=false;this._styleOpen=false;this._loadSettings();}
+
+  async _loadSettings(){try{const r=await chrome.storage.sync.get('brx_subtitle');if(r.brx_subtitle){const s=r.brx_subtitle;if(s.fontSize)this.style.fontSize=s.fontSize;if(s.color)this.style.color=s.color;if(s.bottom!=null)this.style.bottom=s.bottom;if(s.convMode)this.convMode=s.convMode;}}catch(_){}}
+  _saveSettings(){try{chrome.storage.sync.set({brx_subtitle:{fontSize:this.style.fontSize,color:this.style.color,bottom:this.style.bottom,convMode:this.convMode}});}catch(_){}}
 
   async load({cid,aid,type=1}){
     if(this._abort){try{this._abort.abort();}catch(_){}}
@@ -21,7 +24,7 @@ export class SubtitleManager {
     if(!cid||!aid)return[];
     try{const r=await fetchBiliSubtitleVtt({cid,aid,type},{signal:this._abort.signal,log:this.log});
       if(!r)this.log?.info?.('subtitle: no tracks',{cid,aid});
-      else{this.tracks=[{lan:r.lan,lanDoc:r.lanDoc,blobUrl:r.blobUrl,itemCount:r.itemCount}];this.currentIndex=0;await this._preloadConv();this._apply();this.log?.info?.('subtitle: track loaded',{lan:r.lan,items:r.itemCount});}
+      else{this.tracks=[{lan:r.lan,lanDoc:r.lanDoc,blobUrl:r.blobUrl,itemCount:r.itemCount}];this.currentIndex=0;await this._preloadConv();this._apply();this._saveSettings();this.log?.info?.('subtitle: track loaded',{lan:r.lan,items:r.itemCount});}
     }catch(err){if(err?.name!=='AbortError')this.log?.warn?.('subtitle: load failed',err);}
     if(this._uiBuilt){this._updateToggleState();this._renderPanel()};return this.tracks;
   }
@@ -45,15 +48,14 @@ export class SubtitleManager {
     if(!this.art.subtitle.textTrack){const d=URL.createObjectURL(new Blob(['WEBVTT\n\n'],{type:'text/vtt'}));try{this.art.subtitle.createTrack('metadata',d);}catch(_){}}
     const track=this.currentIndex>=0?this.tracks[this.currentIndex]:null;
     if(track){
-      // 字幕内容可能已經在 track.blobUrl 裏。繁簡轉換通過 onVttLoad 同步處理避免 async issue
       this.art.subtitle.init({url:track.blobUrl,type:'vtt',name:track.lanDoc||track.lan||'Subtitle',style:{color:this.style.color,fontSize:this.style.fontSize+'px',bottom:this.style.bottom+'px'},encoding:'utf-8',escape:false,
         onVttLoad:(vtt)=>{if(this.convMode==='s2t')return this._convSync(vtt,'s2t');if(this.convMode==='t2s')return this._convSync(vtt,'t2s');return vtt;}});
     }else{
-      // 空 VTT Blob → 清屏
       const empty=URL.createObjectURL(new Blob(['WEBVTT\n\n'],{type:'text/vtt'}));
       this.art.subtitle.init({url:empty,type:'vtt',name:'',style:{},encoding:'utf-8',escape:false,onVttLoad:(v)=>v});
       URL.revokeObjectURL(empty);
     }
+    this._saveSettings();
   }
 
   // 同步繁簡轉換（不用 async import，首次 load 時 preload）

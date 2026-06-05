@@ -115,6 +115,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
 
   art.on('ready', async () => {
     installResizeRelay();
+    installDanmakuPersistence();
     window.__BRX_PLAYER_DEBUG__ = Object.assign(window.__BRX_PLAYER_DEBUG__ || {}, { art, dashPlayer });
   });
 
@@ -162,6 +163,8 @@ export async function mountPlayer({ playurl, context, config, log }) {
     ];
   }
 
+  let dmInstance = null; // danmuku 插件实例引用，用于持久化
+
   function createArtPlugins() {
     const plugins = [];
     if (window.artplayerPluginDanmuku) {
@@ -170,18 +173,11 @@ export async function mountPlayer({ playurl, context, config, log }) {
         log.warn('danmuku: skip load, context.cid missing', { context });
       }
       const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
-      plugins.push(window.artplayerPluginDanmuku({
-        danmuku: danmukuUrl,
-        speed: 5,
-        opacity: 0.9,
-        fontSize: 25,
-        antiOverlap: true,
-        synchronousPlayback: true,
-        visible: true,
-        emitter: false,
-        heatmap: false,
-        filter: (danmu) => danmu.text.trim().length > 0,
-      }));
+      // 从 chrome.storage 加载已保存的弹幕设置
+      const dmDefaults = { speed:5, opacity:0.9, fontSize:25, antiOverlap:true, synchronousPlayback:true, visible:true };
+      const savedDm = (cfg.brx_danmaku) || {};
+      const dmOpts = { ...dmDefaults, ...savedDm, danmuku: danmukuUrl, emitter: false, heatmap: false, filter: (d) => d.text.trim().length > 0 };
+      plugins.push(window.artplayerPluginDanmuku(dmOpts));
     }
     if (window.artplayerPluginDocumentPip) {
       plugins.push(window.artplayerPluginDocumentPip({ width: 640, height: 360, fallbackToVideoPiP: false, placeholder: '正在以画中画播放' }));
@@ -214,6 +210,22 @@ export async function mountPlayer({ playurl, context, config, log }) {
     if (art?.template?.$player) resizeObserver.observe(art.template.$player);
     if (art?.template?.$container) resizeObserver.observe(art.template.$container);
     if (art?.video) resizeObserver.observe(art.video);
+  }
+
+  function installDanmakuPersistence() {
+    // 弹幕设置变更时自动保存到 chrome.storage.sync
+    const $dm = document.querySelector('.artplayer-plugin-danmuku');
+    if (!$dm) return;
+    const save = () => {
+      const $t = $dm.querySelector('.apd-toggle');
+      const visible = $t ? !$t.querySelector('[class*="off"]') : true;
+      const $sync = $dm.querySelector('.apd-sync-video');
+      const sync = $sync ? !$sync.querySelector('[class*="check_off"]') : false;
+      const $ao = $dm.querySelector('.apd-anti-overlap');
+      const antiOverlap = $ao ? !$ao.querySelector('[class*="check_off"]') : false;
+      try { chrome.storage.sync.set({ brx_danmaku: { visible, synchronousPlayback: sync, antiOverlap } }); } catch (_) {}
+    };
+    $dm.addEventListener('click', () => setTimeout(save, 100));
   }
 
   function onGlobalFullscreenChange() {}
