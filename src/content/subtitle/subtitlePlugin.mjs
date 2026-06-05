@@ -34,7 +34,8 @@ export class SubtitleManager {
   dispose(){
     if(this._abort){try{this._abort.abort();}catch(_){}this._abort=null;}
     this.disposeOldBlobUrls();this.tracks=[];
-    if(this._ui){const t=this._ui.$toggleEl?.(),p=this._ui.panel;if(t?.parentNode)t.parentNode.removeChild(t);if(p?.parentNode)p.parentNode.removeChild(p);}
+    if(this._$toggle?.parentNode)this._$toggle.parentNode.removeChild(this._$toggle);
+    if(this._ui?.panel?.parentNode)this._ui.panel.parentNode.removeChild(this._ui.panel);
     this._ui=null;this._uiBuilt=false;
   }
   disposeOldBlobUrls(){for(const t of this.tracks){if(t.blobUrl)try{URL.revokeObjectURL(t.blobUrl);}catch(_){}}}
@@ -74,41 +75,40 @@ export class SubtitleManager {
     if(!$player)return;
     $player.appendChild(panel);
 
-    let $toggleEl=null;
     this.art.controls.add({
       name:'subtitle',position:'right',index:5,
       html:'<span>'+ICON_CC+'</span>',
       mounted($control){
-        $toggleEl=$control;
+        self._$toggle=$control;
         $control.title='字幕';
-        $control.addEventListener('click',(e)=>{e.stopPropagation();
+        $control.addEventListener('click',(e)=>{e.stopPropagation();e.stopImmediatePropagation();
           const tr=$control.getBoundingClientRect(),pr=$player.getBoundingClientRect();
-          // 只调水平位置对齐 toggle；垂直用 CSS --art-control-height 与设置菜单一致
           panel.style.left=(tr.left+tr.width/2-pr.left-100)+'px';
+          // bottom 固定 56px = 控制栏 50px + 6px 余量，与设置菜单等高
+          panel.style.bottom='56px';
           panel.classList.toggle('open');
+          if(panel.classList.contains('open')){self._convOpen=false;self._styleOpen=false;self._renderPanel();}
           self._updateToggleState();
         });
         self._updateToggleState();
       },
     });
 
-    document.addEventListener('click',(e)=>{
-      if(!$toggleEl||!panel)return;
-      if(e.target===$toggleEl||$toggleEl.contains(e.target)||panel.contains(e.target))return;
+    // 点击播放器空白区域关闭面板（只监听 player 级，toggle 和 panel 内部不关）
+    $player.addEventListener('click',(e)=>{
+      if(!panel.classList.contains('open'))return;
+      if(panel.contains(e.target))return;
+      if(self._$toggle&&self._$toggle.contains(e.target))return;
       panel.classList.remove('open');self._convOpen=false;self._styleOpen=false;
-      if(self._uiBuilt)self._renderPanel();
-    },{capture:true});
-    panel.addEventListener('click',(e)=>e.stopPropagation());
-    panel.addEventListener('pointerdown',(e)=>e.stopPropagation());
+      self._renderPanel();
+    });
 
-    this._ui={panel,$toggleEl:()=>$toggleEl};this._uiBuilt=true;
+    this._ui={panel};this._uiBuilt=true;
     this._updateToggleState();this._renderPanel();
   }
 
   _updateToggleState(){
-    if(!this._ui)return;
-    const $t=this._ui.$toggleEl();
-    if(!$t)return;
+    const $t=this._$toggle;if(!$t)return;
     const off=this.currentIndex===-1;
     const span=$t.querySelector('span');
     if(!span)return;
@@ -117,7 +117,8 @@ export class SubtitleManager {
   }
 
   _renderPanel(){
-    if(!this._ui)return;const{panel}=this._ui,off=this.currentIndex===-1;
+    const panel=this._ui?.panel;if(!panel)return;
+    const off=this.currentIndex===-1;
     let h='';
     h+='<div class="brx-sub-row"><span class="brx-sub-label">字幕</span>';
     h+='<div class="brx-switch'+(off?'':' on')+'" id="brx-sub-main-toggle"><div class="brx-switch-track"></div><div class="brx-switch-knob"></div></div></div>';
