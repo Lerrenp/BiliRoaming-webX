@@ -48,6 +48,10 @@ export async function mountPlayer({ playurl, context, config, log }) {
   let resizeObserver = null;
   let subtitleManager = null;
 
+  // 从 chrome.storage 加载弹幕已保存设置
+  let dmSaved = {};
+  try { const r = await chrome.storage.sync.get('brx_danmaku'); if (r.brx_danmaku) dmSaved = r.brx_danmaku; } catch (_) {}
+
   function nextMpdUrl() {
     if (mpdObjectUrl) URL.revokeObjectURL(mpdObjectUrl);
     const mpd = createMpdUrl(dash, selection);
@@ -175,8 +179,7 @@ export async function mountPlayer({ playurl, context, config, log }) {
       const danmukuUrl = cid ? `https://comment.bilibili.com/${cid}.xml` : [];
       // 从 chrome.storage 加载已保存的弹幕设置
       const dmDefaults = { speed:5, opacity:0.9, fontSize:25, antiOverlap:true, synchronousPlayback:true, visible:true };
-      const savedDm = (cfg.brx_danmaku) || {};
-      const dmOpts = { ...dmDefaults, ...savedDm, danmuku: danmukuUrl, emitter: false, heatmap: false, filter: (d) => d.text.trim().length > 0 };
+      const dmOpts = { ...dmDefaults, ...dmSaved, danmuku: danmukuUrl, emitter: false, heatmap: false, filter: (d) => d.text.trim().length > 0 };
       plugins.push(window.artplayerPluginDanmuku(dmOpts));
     }
     if (window.artplayerPluginDocumentPip) {
