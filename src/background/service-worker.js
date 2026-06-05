@@ -23,8 +23,8 @@ async function enableDnrForTab(tabId) {
         resourceTypes: ['media', 'xmlhttprequest']
       }
     }];
-    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [tabId] });
-    await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rules });
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] });
+    await chrome.declarativeNetRequest.updateSessionRules({ addRules: rules });
     return { ok: true, tabId, ruleCount: 1 };
   } catch (e) {
     dnrTabs.delete(tabId);
@@ -34,7 +34,7 @@ async function enableDnrForTab(tabId) {
 
 async function disableDnrForTab(tabId) {
   if (!tabId || !dnrTabs.delete(tabId)) return;
-  try { await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [tabId] }); } catch (_) {}
+  try { await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] }); } catch (_) {}
 }
 
 // 标签页关闭 → 清理
