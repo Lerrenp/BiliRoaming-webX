@@ -12,9 +12,13 @@ export function patchM4sUrl(url){
     const u=new URL(url);
     const buvid3=getCookie('buvid3');
     if(buvid3&&(!u.searchParams.get('buvid')||u.searchParams.get('buvid')==='')) u.searchParams.set('buvid',buvid3);
-    // 兜底：某些 BiliRoaming 服务端返回 Android CDN URL (platform=android)，
-    // 在 web 浏览器中会导致 403。改写为 platform=pc。
+    // 修正 CDN URL 参数，避免 403：
+    // 1. platform=android → pc (服务端 Android 凭证取流)
     if(u.searchParams.get('platform')==='android') u.searchParams.set('platform','pc');
+    // 2. build=6800300 → 0 (app build 残留；build 不在 upsig 签名中，安全)
+    if(u.searchParams.get('build')==='6800300'&&u.searchParams.get('platform')==='pc') u.searchParams.set('build','0');
+    // 3. 清除 CDN 回退时可能残留的 app 专属参数（不在签名中）
+    ['mobi_app','device','otype','module'].forEach(p=>{if(u.searchParams.has(p))u.searchParams.delete(p)});
     return u.href;
   }catch(_){return url}
 }
